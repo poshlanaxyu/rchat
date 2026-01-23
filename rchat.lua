@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2301202602")
+script_version("2301202603")
 
 local se = require 'lib.samp.events'
 
@@ -15,12 +15,16 @@ local HOST = "103.54.19.207"
 local PORT = 18310
 local RECONNECT_DELAY = 1.0 -- Секунд между попытками переподключения
 local HEARTBEAT_INTERVAL = 1.0 -- Секунд между пингами
+local GPS_UPDATE_INTERVAL = 1.0
 
 -- Переменные состояния
 local client = nil
 local is_connected = false
 local last_reconnect_attempt = 0
 local last_heartbeat = 0
+local last_gps_update = 0
+local gps_active = true
+local DEBUG = false
 
 function getAllSampPlayers()
     players = {}
@@ -57,7 +61,14 @@ end
 
 local attackers = {}
 
+local gps_data = {}
+
 function se.onPlayerDeath(player_id)
+    local myId = select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))
+    if player_id == myId then
+        attackers = {}
+        return true
+    end
     for k,v in pairs(attackers) do
         if player_id == v then
             local color = sampGetPlayerColor(player_id)
@@ -68,6 +79,12 @@ function se.onPlayerDeath(player_id)
 end
 
 function se.onPlayerQuit(player_id, reason)
+    for k,v in pairs(gps_data) do
+        if v.id == player_id then
+            table.remove(gps_data, k)
+            break
+        end
+    end
 	for k,v in pairs(attackers) do
         if player_id == v then
             local color = sampGetPlayerColor(player_id)
@@ -133,12 +150,17 @@ function main()
     sampAddChatMessage("RdugChat: /u [текст].", 0xAAAAAA)
     sampRegisterChatCommand("u", cmd_send_chat)
     sampRegisterChatCommand("ulist", cmd_list_online)
+    sampRegisterChatCommand("ugps", cmd_ugps)
 
     -- Первая попытка подключения
     connect_to_server()
 
     while true do
-        wait(300)
+        if is_connected then
+            wait(100)
+        else
+            wait(1000) 
+        end
         local current_time = os.clock()
 
         if is_connected and client then
@@ -157,6 +179,14 @@ function main()
             elseif err == "closed" then
                 print("Связь разорвана сервером.")
                 disconnect()
+            end
+
+
+            if current_time - last_gps_update > GPS_UPDATE_INTERVAL then
+                if getActiveInterior() == 0 then
+                    send_gps()
+                end
+                last_gps_update = current_time
             end
 
             ------------------------------------------------
@@ -204,6 +234,42 @@ function handle_packet(msg)
             end
             sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s", v.nick, v.id, u8:decode(v.rank), afk), 0xFFFFFF)
         end
+    
+    elseif msg.type == "gps" then
+        if not gps_active then return end
+        local is_new = true
+        for k,v in pairs(gps_data) do
+            if v.id == msg.id then
+                is_new = false
+                break
+            end
+        end
+
+        if is_new then
+            if not msg.disabled then
+                local blip = addSpriteBlipForCoord(msg.x, msg.y, msg.z, 0)
+                changeBlipColour(blip, msg.color)
+                local data = {
+                    blip = blip,
+                    id = msg.id,
+                    nick = msg.nick
+                }
+                table.insert(gps_data, data)
+            end
+        else
+            for k,v in pairs(gps_data) do
+                if v.id == msg.id then
+                    if not msg.disabled then
+                        changeBlipColour(v.blip, msg.color)
+                        setBlipCoordinates(v.blip, msg.x, msg.y, msg.z)
+                    else
+                        removeBlip(v.blip)
+                        table.remove(gps_data, k)
+                    end
+                    break
+                end
+            end
+        end
 
     elseif msg.type == "attacker" then
         if msg.is_done then
@@ -223,6 +289,19 @@ function handle_packet(msg)
         sampAddChatMessage(msg.text, 0xfbec5d)
     end
     -- Пакеты типа "ping" можно игнорировать, они нужны только для поддержания TCP
+end
+
+function cmd_ugps()
+    gps_active = not gps_active
+    if gps_active then
+        sampAddChatMessage("[РДУГ] {FFFFFF}GPS включен!", 0xfbec5d)
+    else
+        for k,v in pairs(gps_data) do
+            removeBlip(v.blip)
+        end
+        gps_data = {}
+        sampAddChatMessage("[РДУГ] {FFFFFF}GPS отключен!", 0xfbec5d)  
+    end
 end
 
 function cmd_send_chat(arg)
@@ -257,7 +336,9 @@ function cmd_send_login(arg)
     }
     
     -- Отправляем JSON
-    send_json(packet)
+    if not DEBUG then
+        send_json(packet) 
+    end
 end
 
 function cmd_list_online(arg)
@@ -280,6 +361,27 @@ function send_attacker(player_id, player_nick, is_done, color)
     }
     
     -- Отправляем JSON
+    send_json(packet)
+end
+
+function send_gps()
+    local myName = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
+    local myId = select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))
+    local myColor = sampGetPlayerColor(myId)
+    local x, y, z = getCharCoordinates(PLAYER_PED)
+    local disabled = isPlayerDead(PLAYER_PED)
+    
+    local packet = {
+        type = "gps",
+        nick = myName,
+        id = myId,
+        color = myColor,
+        x = x,
+        y = y,
+        z = z,
+        disabled = disabled
+    }
+
     send_json(packet)
 end
 
