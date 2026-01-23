@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("23012026")
+script_version("2301202601")
 
 local se = require 'lib.samp.events'
 
@@ -70,27 +70,20 @@ end
 function attacker_mark(id)
     lua_thread.create(function()
         local create_time = os.clock()
-        local next_update = os.clock() + 0.3
         local player_id = id
         local orig_color = argb_to_rgba(sampGetPlayerColor(player_id))
-        local to_orig = false
         local is_done = false
         while (os.clock() - create_time) < 120 and not is_done do
             wait(0)
+            setPlayerColor(player_id, 0xFF0000FF)
+            wait(300)
+            setPlayerColor(player_id, orig_color)
+            wait(300)
             is_done = true
             for k, v in pairs(attackers) do
                 if v == player_id then
                     is_done = false
                 end
-            end
-            if os.clock() >= next_update then
-                if to_orig then
-                    setPlayerColor(player_id, orig_color)
-                else
-                    setPlayerColor(player_id, 0xFF0000FF)
-                end
-                to_orig = not to_orig
-                next_update = os.clock() + 0.3
             end
         end
     end)
