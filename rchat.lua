@@ -15,7 +15,7 @@ local HOST = "103.54.19.207"
 local PORT = 18310
 local RECONNECT_DELAY = 1.0 -- Секунд между попытками переподключения
 local HEARTBEAT_INTERVAL = 1.0 -- Секунд между пингами
-local GPS_UPDATE_INTERVAL = 1.0
+local GPS_UPDATE_INTERVAL = 0.1
 
 -- Переменные состояния
 local client = nil
@@ -81,6 +81,7 @@ end
 function se.onPlayerQuit(player_id, reason)
     for k,v in pairs(gps_data) do
         if v.id == player_id then
+            removeBlip(v.blip)
             table.remove(gps_data, k)
             break
         end
