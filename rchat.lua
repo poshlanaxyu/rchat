@@ -251,6 +251,7 @@ function handle_packet(msg)
                 if not msg_data.disabled then
                     local blip = addSpriteBlipForCoord(msg_data.x, msg_data.y, msg_data.z, 0)
                     changeBlipColour(blip, msg_data.color)
+                    changeBlipScale(blip, 2)
                     local data = {
                         blip = blip,
                         id = msg_data.id,
@@ -263,6 +264,7 @@ function handle_packet(msg)
                     if v.id == msg_data.id then
                         if not msg_data.disabled then
                             changeBlipColour(v.blip, msg_data.color)
+                            changeBlipScale(v.blip, 2)
                             setBlipCoordinates(v.blip, msg_data.x, msg_data.y, msg_data.z)
                         else
                             removeBlip(v.blip)
@@ -378,7 +380,7 @@ function send_gps()
         type = "gps",
         nick = myName,
         id = myId,
-        color = myColor,
+        color = argb_to_rgba(myColor),
         x = x,
         y = y,
         z = z,
