@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2301202601")
+script_version("2301202602")
 
 local se = require 'lib.samp.events'
 
@@ -67,6 +67,16 @@ function se.onPlayerDeath(player_id)
     end
 end
 
+function se.onPlayerQuit(player_id, reason)
+	for k,v in pairs(attackers) do
+        if player_id == v then
+            local color = sampGetPlayerColor(player_id)
+            send_attacker(player_id, sampGetPlayerNickname(player_id), true, string.format('%06X', bit.band(color, 0xFFFFFF)))
+            break
+        end
+    end
+end
+
 function attacker_mark(id)
     lua_thread.create(function()
         local create_time = os.clock()
@@ -97,19 +107,21 @@ function se.onShowTextDraw(id, data)
     
     if text:find("HA ‹AC HAŒA‡ …‚POK ~r~") then
         local attacker_name = text:gsub(".*HA ‹AC HAŒA‡ …‚POK ~r~",""):gsub("~w~.~n~.*","")
-        local attacker_id = 0
+        local attacker_id = -1
         for id, name in pairs(getAllSampPlayers()) do
             if string.lower(name):find(string.lower(attacker_name)) then
                 attacker_id = id
                 attacker_name = name
             end
         end
-        if attacker_name ~= last_attacker or os.clock() - last_attacker_time > 30 then
-            last_attacker = attacker_name
-            last_attacker_time = os.clock()
-            local color = sampGetPlayerColor(attacker_id)
-            send_attacker(attacker_id, attacker_name, false, string.format('%06X', bit.band(color, 0xFFFFFF)))
-            cmd_send_chat("{FF6666}!!! Îáîğîíà ïî {" .. string.format('%06X', bit.band(color, 0xFFFFFF)) .. "}" .. attacker_name .. " [" ..  attacker_id .. "]")
+        if attacker_id ~= -1 then
+            if attacker_name ~= last_attacker or os.clock() - last_attacker_time > 30 then
+                last_attacker = attacker_name
+                last_attacker_time = os.clock()
+                local color = sampGetPlayerColor(attacker_id)
+                send_attacker(attacker_id, attacker_name, false, string.format('%06X', bit.band(color, 0xFFFFFF)))
+                cmd_send_chat("{FF6666}!!! Îáîğîíà ïî {" .. string.format('%06X', bit.band(color, 0xFFFFFF)) .. "}" .. attacker_name .. " [" ..  attacker_id .. "]")
+            end
         end
     end
 end
