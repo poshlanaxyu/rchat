@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2301202603")
+script_version("2301202604")
 
 local se = require 'lib.samp.events'
 
@@ -158,7 +158,7 @@ function main()
 
     while true do
         if is_connected then
-            wait(100)
+            wait(0)
         else
             wait(1000) 
         end
@@ -238,36 +238,38 @@ function handle_packet(msg)
     
     elseif msg.type == "gps" then
         if not gps_active then return end
-        local is_new = true
-        for k,v in pairs(gps_data) do
-            if v.id == msg.id then
-                is_new = false
-                break
-            end
-        end
-
-        if is_new then
-            if not msg.disabled then
-                local blip = addSpriteBlipForCoord(msg.x, msg.y, msg.z, 0)
-                changeBlipColour(blip, msg.color)
-                local data = {
-                    blip = blip,
-                    id = msg.id,
-                    nick = msg.nick
-                }
-                table.insert(gps_data, data)
-            end
-        else
+        for k, msg_data in pairs(msg.data) do
+            local is_new = true
             for k,v in pairs(gps_data) do
-                if v.id == msg.id then
-                    if not msg.disabled then
-                        changeBlipColour(v.blip, msg.color)
-                        setBlipCoordinates(v.blip, msg.x, msg.y, msg.z)
-                    else
-                        removeBlip(v.blip)
-                        table.remove(gps_data, k)
-                    end
+                if v.id == msg_data.id then
+                    is_new = false
                     break
+                end
+            end
+
+            if is_new then
+                if not msg_data.disabled then
+                    local blip = addSpriteBlipForCoord(msg_data.x, msg_data.y, msg_data.z, 0)
+                    changeBlipColour(blip, msg_data.color)
+                    local data = {
+                        blip = blip,
+                        id = msg_data.id,
+                        nick = msg_data.nick
+                    }
+                    table.insert(gps_data, data)
+                end
+            else
+                for k,v in pairs(gps_data) do
+                    if v.id == msg_data.id then
+                        if not msg_data.disabled then
+                            changeBlipColour(v.blip, msg_data.color)
+                            setBlipCoordinates(v.blip, msg_data.x, msg_data.y, msg_data.z)
+                        else
+                            removeBlip(v.blip)
+                            table.remove(gps_data, k)
+                        end
+                        break
+                    end
                 end
             end
         end
