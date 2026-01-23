@@ -11,12 +11,12 @@ local u8 = encoding.UTF8
 
 -- КОНФИГУРАЦИЯ
 local CFG = {
-    HOST = "127.0.0.1", -- Твой IP
+    HOST = "103.54.19.207",
     PORT = 18310,
-    SECRET_KEY = "14londonpidor88", -- Тот же ключ, что на сервере
-    GPS_INTERVAL = 0.2,    
-    PING_INTERVAL = 2.0,   
-    RECONNECT_DELAY = 3.0,
+    SECRET_KEY = "TEMPKEY1488228_PATOM_POMENYAEM",
+    GPS_INTERVAL = 0.1,    
+    PING_INTERVAL = 1.0,   
+    RECONNECT_DELAY = 1.0,
     DEBUG = false
 }
 
@@ -91,7 +91,15 @@ function Utils.getPlayerId() return select(2, sampGetPlayerIdByCharHandle(PLAYER
 function Utils.getPlayerNick() return sampGetPlayerNickname(Utils.getPlayerId()) end
 function Utils.argb_to_rgba(argb) return bit.bor(bit.lshift(bit.band(bit.rshift(argb, 16), 0xFF), 24), bit.lshift(bit.band(bit.rshift(argb, 8), 0xFF), 16), bit.lshift(bit.band(argb, 0xFF), 8), bit.band(bit.rshift(argb, 24), 0xFF)) end
 function Utils.hex_color(int_color) return string.format('%06X', bit.band(int_color, 0xFFFFFF)) end
-
+function Utils.getAllSampPlayers()
+    players = {}
+    for i = 0, sampGetMaxPlayerId() do
+        if sampIsPlayerConnected(i) or i == myId then
+            players[i] = sampGetPlayerNickname(i)
+        end
+    end
+    return players
+end
 -- === СЕТЬ ===
 
 local Network = {}
@@ -99,24 +107,25 @@ local Network = {}
 function Network.connect()
     if State.tcp then State.tcp:close() end
     State.tcp = socket.tcp()
-    State.tcp:settimeout(0.1)
+    State.tcp:settimeout(0.2)
     
     local res, err = State.tcp:connect(CFG.HOST, CFG.PORT)
     if res then
         State.tcp:settimeout(0) 
         State.connected = true
-        sampAddChatMessage("[RDUG] {00FF00}Подключено к серверу!", -1)
+        sampAddChatMessage("RdugChat: Подключено!", 0x00FF00) -- ОРИГИНАЛ
         Network.send("login", {
             version = thisScript().version,
             nick = Utils.getPlayerNick(),
             id = Utils.getPlayerId(),
-            rank = "User"
         })
+    else
+        print("Connection failed: " .. tostring(err))
     end
 end
 
 function Network.disconnect()
-    if State.connected then sampAddChatMessage("[RDUG] {FF0000}Соединение разорвано.", -1) end
+    if State.connected then sampAddChatMessage("RdugChat: Потеря соединения...", 0xFF0000) end -- ОРИГИНАЛ
     State.connected = false
     if State.tcp then State.tcp:close() end
     State.tcp = nil
@@ -131,7 +140,6 @@ function Network.send(type, data)
     local status, json_str = pcall(cjson.encode, data)
     if not status then return end
     
-    -- Шифрование
     local encrypted = rc4(CFG.SECRET_KEY, json_str)
     local b64 = enc_base64(encrypted)
     
@@ -150,7 +158,6 @@ function Network.receive()
             break
         end
         
-        -- Расшифровка
         local encrypted = dec_base64(line)
         local json_str = rc4(CFG.SECRET_KEY, encrypted)
         
@@ -164,22 +171,32 @@ end
 PacketHandlers = {}
 function PacketHandlers.dispatch(msg) if PacketHandlers[msg.type] then PacketHandlers[msg.type](msg) end end
 
-PacketHandlers['system'] = function(msg) sampAddChatMessage("[SERVER] " .. u8:decode(msg.text), 0xAAAAAA) end
-PacketHandlers['chat'] = function(msg)
-    local color = msg.color or 0xFBEC5D
-    sampAddChatMessage(string.format("%s[%d]: %s", msg.nick, msg.id, u8:decode(msg.text)), color)
+PacketHandlers['system'] = function(msg) 
+    -- ОРИГИНАЛ: 0xfbec5d (желтоватый), а не серый
+    sampAddChatMessage(u8:decode(msg.text), 0xfbec5d) 
 end
+
+PacketHandlers['chat'] = function(msg)
+    -- ОРИГИНАЛ: 0xfbec5d по дефолту
+    local hexColor = msg.color or 0xfbec5d
+    sampAddChatMessage(string.format("%s[%s]: %s", msg.nick, msg.id, u8:decode(msg.text)), hexColor)
+end
+
 PacketHandlers['online'] = function(msg)
-    sampAddChatMessage("--- RDUG Online: " .. #msg.clients .. " ---", 0x33CCFF)
-    for _, client in ipairs(msg.clients) do
-        local paused = sampIsPlayerPaused(client.id) and " {FF0000}[AFK]" or ""
-        sampAddChatMessage(string.format("- %s [%d] %s", client.nick, client.id, paused), 0xFFFFFF)
+    -- ОРИГИНАЛ
+    sampAddChatMessage("Члены подвального чата онлайн, всего {D8A903}" .. #msg.clients .. "{FFFFFF} человек:", 0xFFFFFF)
+    for _, v in ipairs(msg.clients) do
+        local afk = ""
+        if sampIsPlayerPaused(v.id) then afk = " {34C924}< AFK >" end
+        sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s", v.nick, v.id, u8:decode(v.rank), afk), 0xFFFFFF)
     end
 end
+
 PacketHandlers['gps'] = function(msg)
     if not State.gps_enabled then return end
     for _, data in ipairs(msg.data) do GameLogic.updateBlip(data) end
 end
+
 PacketHandlers['attacker'] = function(msg)
     if msg.is_done then
         State.attackers[msg.id] = nil
@@ -194,6 +211,8 @@ end
 GameLogic = {}
 function GameLogic.updateBlip(data)
     local pid = data.id
+    if not pid then return end -- FIX CRASH
+    
     if data.disabled then
         if State.gps_store[pid] then removeBlip(State.gps_store[pid].blip); State.gps_store[pid] = nil end
         return
@@ -203,7 +222,7 @@ function GameLogic.updateBlip(data)
     else
         local blip = addSpriteBlipForCoord(data.x, data.y, data.z, 0)
         changeBlipScale(blip, 2)
-        changeBlipColour(blip, data.color)
+        changeBlipColour(blip, data.color or 0xFFFFFF)
         State.gps_store[pid] = { blip = blip }
     end
 end
@@ -213,8 +232,6 @@ function GameLogic.clearGPS()
 end
 function GameLogic.flashPlayer(id)
     local start = os.clock()
-    local handle_found, handle = sampGetCharHandleBySampPlayerId(id)
-    if not handle_found then return end
     local orig_color = Utils.argb_to_rgba(sampGetPlayerColor(id))
     while State.attackers[id] and (os.clock() - start < 120) do
         Network.setPlayerColor(id, 0xFF0000FF)
@@ -233,21 +250,35 @@ end
 -- === SAMP EVENTS ===
 function se.onPlayerQuit(id)
     if State.gps_store[id] then removeBlip(State.gps_store[id].blip); State.gps_store[id] = nil end
-    State.attackers[id] = nil
+    if State.attackers[id] ~= nil then
+        local color = sampGetPlayerColor(id)
+        Network.send("attacker", { id = id, nick = sampGetPlayerNickname(id), color = Utils.hex_color(color), is_done = true })
+    end
 end
+
+function se.onPlayerDeath(id)
+    if id == Utils.getPlayerId() then
+        State.attackers = {} 
+        return true
+    end
+
+    if State.attackers[id] ~= nil then
+        local color = sampGetPlayerColor(id)
+        Network.send("attacker", { id = id, nick = sampGetPlayerNickname(id), color = Utils.hex_color(color), is_done = true })
+    end
+end
+
 function se.onShowTextDraw(id, data)
+    -- ОРИГИНАЛЬНАЯ СТРОКА ДЛЯ ТРИНИТИ
     if data.text:find("HA ‹AC HAЊA‡ …‚POK ~r~") then
-        local raw_name = data.text:match("HA ‹AC HAЊA‡ …‚POK ~r~([^~]+)")
-        if raw_name then
-            for i = 0, 1000 do
-                if sampIsPlayerConnected(i) then
-                    local name = sampGetPlayerNickname(i)
-                    if name:find(raw_name) then
-                        local color = sampGetPlayerColor(i)
-                        Network.send("attacker", { id = i, nick = name, color = Utils.hex_color(color), is_done = false })
-                        Network.send("chat", { text = "{FF6666}!!! Оборона по {"..Utils.hex_color(color).."}"..name.." ["..i.."]" })
-                        break
-                    end
+
+        local attacker_name = data.text:gsub(".*HA ‹AC HAЊA‡ …‚POK ~r~",""):gsub("~w~.~n~.*","")
+        for id, name in pairs(Utils.getAllSampPlayers()) do
+            if string.lower(name):find(string.lower(attacker_name)) then
+                if not State.attackers[id] then
+                    local color = sampGetPlayerColor(id)
+                    Network.send("attacker", { id = id, nick = name, color = Utils.hex_color(color), is_done = false })
+                    Network.send("chat", { text = u8("{FF6666}!!! Оборона по {"..Utils.hex_color(color).."}"..name.." ["..id.."]"), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
                 end
             end
         end
@@ -259,8 +290,19 @@ function main()
     if not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
     
-    sampRegisterChatCommand("u", function(arg) if #arg > 0 then Network.send("chat", { text = arg }) end end)
-    sampRegisterChatCommand("ugps", function() State.gps_enabled = not State.gps_enabled; if not State.gps_enabled then GameLogic.clearGPS() end; sampAddChatMessage(State.gps_enabled and "GPS ON" or "GPS OFF", -1) end)
+    sampAddChatMessage("RdugChat: /u [текст].", 0xAAAAAA) -- ОРИГИНАЛ
+    
+    sampRegisterChatCommand("u", function(arg)
+        if #arg > 0 then
+            Network.send("chat", { text = u8(arg), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() }) else sampAddChatMessage("Используйте: /u [текст]", -1)
+        end
+    end)
+    sampRegisterChatCommand("ugps", function() 
+        State.gps_enabled = not State.gps_enabled
+        if not State.gps_enabled then GameLogic.clearGPS() end
+        -- ОРИГИНАЛ
+        sampAddChatMessage(State.gps_enabled and "[РДУГ] {FFFFFF}GPS включен!" or "[РДУГ] {FFFFFF}GPS отключен!", 0xfbec5d) 
+    end)
     sampRegisterChatCommand("ulist", function() Network.send("online") end)
     
     Network.connect()
