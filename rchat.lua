@@ -11,7 +11,7 @@ encoding.default = 'CP1251'
 u8 = encoding.UTF8
 
 -- НАСТРОЙКИ
-local HOST = "103.54.19.207"
+local HOST = "127.0.0.1"
 local PORT = 18310
 local RECONNECT_DELAY = 1.0 -- Секунд между попытками переподключения
 local HEARTBEAT_INTERVAL = 1.0 -- Секунд между пингами
@@ -268,8 +268,8 @@ end
 function send_attacker(player_id, player_nick, is_done, color)
     local packet = {
         type = "attacker",
-        nick = myName,
-        id = myId,
+        nick = player_nick,
+        id = player_id,
         is_done = is_done,
         color = color
     }
