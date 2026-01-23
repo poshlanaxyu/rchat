@@ -11,7 +11,7 @@ encoding.default = 'CP1251'
 u8 = encoding.UTF8
 
 -- НАСТРОЙКИ
-local HOST = "127.0.0.1"
+local HOST = "103.54.19.207"
 local PORT = 18310
 local RECONNECT_DELAY = 1.0 -- Секунд между попытками переподключения
 local HEARTBEAT_INTERVAL = 1.0 -- Секунд между пингами
