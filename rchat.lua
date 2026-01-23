@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2301202605")
+script_version("2301202606")
 
 -- ахакхнрейх
 local se = require 'lib.samp.events'
@@ -315,8 +315,8 @@ function main()
             Network.receive()
             if now - State.last_ping > CFG.PING_INTERVAL then Network.send("ping"); State.last_ping = now end
             if now - State.last_gps > CFG.GPS_INTERVAL then
-                local res, x, y, z = getCharCoordinates(PLAYER_PED)
-                if res and getActiveInterior() == 0 then
+                local x, y, z = getCharCoordinates(PLAYER_PED)
+                if getActiveInterior() == 0 then
                     Network.send("gps", { x=x, y=y, z=z, color=Utils.argb_to_rgba(sampGetPlayerColor(Utils.getPlayerId())), disabled=isPlayerDead(PLAYER_PED) })
                 end
                 State.last_gps = now
