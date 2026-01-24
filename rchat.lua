@@ -274,6 +274,7 @@ function se.onServerMessage(color, message)
     if State.send_wlow and message:find("Вы не находитесь в розыске.") then
         Network.send("wlow", { wlow = 0 })
         State.send_wlow = false
+        return false
     end
 end
 
