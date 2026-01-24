@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2301202606")
+script_version("2501202601")
 
 -- ¡»¡À»Œ“≈ »
 local se = require 'lib.samp.events'
@@ -279,6 +279,7 @@ function se.onShowTextDraw(id, data)
             if string.lower(name):find(string.lower(attacker_name)) then
                 if not State.attackers[id] then
                     local color = sampGetPlayerColor(id)
+                    State.attackers[id] = { nick = name, time = os.time() + 120 }
                     Network.send("attacker", { id = id, nick = name, color = Utils.hex_color(color), is_done = false })
                     Network.send("chat", { text = u8("{FF6666}!!! Œ·ÓÓÌ‡ ÔÓ {"..Utils.hex_color(color).."}"..name.." ["..id.."]"), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
                 end
