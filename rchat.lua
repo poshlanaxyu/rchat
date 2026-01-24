@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2501202602")
+script_version("2501202603")
 
 -- ахакхнрейх
 local se = require 'lib.samp.events'
@@ -199,8 +199,8 @@ end
 
 PacketHandlers['attacker'] = function(msg)
     if State.attackers[msg.id] == nil then
-        lua_thread.create(GameLogic.flashPlayer, msg.id)
         State.attackers[msg.id] = { nick = msg.nick, time = os.time() + 120 }
+        lua_thread.create(GameLogic.flashPlayer, msg.id)
     else
         if msg.is_done then
             State.attackers[msg.id] = nil
