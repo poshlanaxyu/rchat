@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2501202601")
+script_version("2501202602")
 
 -- ¡»¡À»Œ“≈ »
 local se = require 'lib.samp.events'
@@ -198,13 +198,15 @@ PacketHandlers['gps'] = function(msg)
 end
 
 PacketHandlers['attacker'] = function(msg)
-    if msg.is_done then
-        State.attackers[msg.id] = nil
-    else
-        if State.attackers[msg.id] ~= nil then
-            lua_thread.create(GameLogic.flashPlayer, msg.id)
-        end
+    if State.attackers[msg.id] == nil then
+        lua_thread.create(GameLogic.flashPlayer, msg.id)
         State.attackers[msg.id] = { nick = msg.nick, time = os.time() + 120 }
+    else
+        if msg.is_done then
+            State.attackers[msg.id] = nil
+        else
+            State.attackers[msg.id] = { nick = msg.nick, time = os.time() + 120 }
+        end
     end
 end
 
@@ -280,6 +282,7 @@ function se.onShowTextDraw(id, data)
                 if not State.attackers[id] then
                     local color = sampGetPlayerColor(id)
                     State.attackers[id] = { nick = name, time = os.time() + 120 }
+                    lua_thread.create(GameLogic.flashPlayer, id)
                     Network.send("attacker", { id = id, nick = name, color = Utils.hex_color(color), is_done = false })
                     Network.send("chat", { text = u8("{FF6666}!!! Œ·ÓÓÌ‡ ÔÓ {"..Utils.hex_color(color).."}"..name.." ["..id.."]"), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
                 end
