@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2501202603")
+script_version("2501202604")
 
 -- ахакхнрейх
 local se = require 'lib.samp.events'
@@ -216,6 +216,7 @@ GameLogic = {}
 function GameLogic.updateBlip(data)
     local pid = data.id
     if not pid then return end -- FIX CRASH
+    if pid == Utils.getPlayerId() then return end
     
     if data.disabled then
         if State.gps_store[pid] then removeBlip(State.gps_store[pid].blip); State.gps_store[pid] = nil end
