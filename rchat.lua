@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2501202604")
+script_version("2501202605")
 
 -- БИБЛИОТЕКИ
 local se = require 'lib.samp.events'
@@ -17,6 +17,7 @@ local CFG = {
     GPS_INTERVAL = 0.1,    
     PING_INTERVAL = 1.0,   
     RECONNECT_DELAY = 1.0,
+    WLOW_INTERVAL = 60.0,
     DEBUG = false
 }
 
@@ -26,10 +27,13 @@ local State = {
     connected = false,
     last_ping = 0,
     last_gps = 0,
+    last_wlow = os.clock(),
     last_reconnect = 0,
     gps_enabled = true,
     gps_store = {},    
     attackers = {},   
+    is_z = false,
+    send_wlow = false
 }
 
 -- === КРИПТОГРАФИЯ (RC4 + Base64) ===
@@ -114,11 +118,13 @@ function Network.connect()
         State.tcp:settimeout(0) 
         State.connected = true
         sampAddChatMessage("RdugChat: Подключено!", 0x00FF00) -- ОРИГИНАЛ
-        Network.send("login", {
-            version = thisScript().version,
-            nick = Utils.getPlayerNick(),
-            id = Utils.getPlayerId(),
-        })
+        if not CFG.DEBUG then
+            Network.send("login", {
+                version = thisScript().version,
+                nick = Utils.getPlayerNick(),
+                id = Utils.getPlayerId(),
+            })
+        end
     else
         print("Connection failed: " .. tostring(err))
     end
@@ -187,8 +193,10 @@ PacketHandlers['online'] = function(msg)
     sampAddChatMessage("Члены подвального чата онлайн, всего {D8A903}" .. #msg.clients .. "{FFFFFF} человек:", 0xFFFFFF)
     for _, v in ipairs(msg.clients) do
         local afk = ""
+        local wlow = ""
         if sampIsPlayerPaused(v.id) then afk = " {34C924}< AFK >" end
-        sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s", v.nick, v.id, u8:decode(v.rank), afk), 0xFFFFFF)
+        if v.wlow > 0 then wlow = string.format(" {FF2222}В РОЗЫСКЕ: {FFFFFF}%d зв", v.wlow) end
+        sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow), 0xFFFFFF)
     end
 end
 
@@ -252,6 +260,23 @@ function Network.setPlayerColor(id, col)
     raknetEmulRpcReceiveBitStream(72, bs); raknetDeleteBitStream(bs)
 end
 
+function se.onServerMessage(color, message)
+	if message:find("{FF4500} начал ваше задержание.") or message:find("{FF4500} начала ваше задержание.") then
+		State.is_z = true
+		Network.send("chat", { text = u8(message), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
+	end
+
+	if message:find("{FF4500} остановила ваше задержание.") or message:find("{FF4500} остановил ваше задержание.") or message:find("Вас не успели задержать сотрудники ПО. В ближайшие {33aa33}") then
+		State.is_z = false
+		Network.send("chat", { text = u8(message), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
+	end
+
+    if State.send_wlow and message:find("Вы не находитесь в розыске.") then
+        Network.send("wlow", { wlow = 0 })
+        State.send_wlow = false
+    end
+end
+
 -- === SAMP EVENTS ===
 function se.onPlayerQuit(id)
     if State.gps_store[id] then removeBlip(State.gps_store[id].blip); State.gps_store[id] = nil end
@@ -264,6 +289,7 @@ end
 function se.onPlayerDeath(id)
     if id == Utils.getPlayerId() then
         State.attackers = {} 
+        State.is_z = false
         return true
     end
 
@@ -274,6 +300,16 @@ function se.onPlayerDeath(id)
 end
 
 function se.onShowTextDraw(id, data)
+    -- Ignore Z
+	local ignore_colors = {-14869219, 1711276160, 1724658432, 1721303040, 1728013824, 1711276287, 1714631679}
+	if State.is_z then
+		for k, v in pairs(ignore_colors) do
+			if data.boxColor == v and data.backgroundColor == -16777216 then
+				return false
+			end
+		end
+	end
+
     -- ОРИГИНАЛЬНАЯ СТРОКА ДЛЯ ТРИНИТИ
     if data.text:find("HA ‹AC HAЊA‡ …‚POK ~r~") then
 
@@ -290,6 +326,19 @@ function se.onShowTextDraw(id, data)
             end
         end
     end
+end
+
+function se.onShowDialog(id, style, title, btn1, btn2, text)
+	if State.send_wlow and title:find("{34C924}Информация о вашем розыске") then
+		local total_stars = 0
+		for count in text:gmatch("розыск %- (%d+)") do
+		    total_stars = total_stars + tonumber(count)
+		end
+        Network.send("wlow", { wlow = total_stars })
+        State.send_wlow = false
+		sampSendDialogResponse(id, 1, -1, -1)
+		return false
+	end
 end
 
 -- === MAIN ===
@@ -319,6 +368,13 @@ function main()
         if State.connected then
             Network.receive()
             if now - State.last_ping > CFG.PING_INTERVAL then Network.send("ping"); State.last_ping = now end
+            if now - State.last_wlow > CFG.WLOW_INTERVAL and not State.send_wlow then
+                if not sampIsDialogActive() and not sampIsChatInputActive() and not isSampfuncsConsoleActive() then
+                    State.send_wlow = true
+                    sampSendChat("/wlow")
+                    State.last_wlow = now
+                end
+            end
             if now - State.last_gps > CFG.GPS_INTERVAL then
                 local x, y, z = getCharCoordinates(PLAYER_PED)
                 if getActiveInterior() == 0 then
