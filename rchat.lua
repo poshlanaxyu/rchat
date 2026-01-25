@@ -212,8 +212,10 @@ end
 
 PacketHandlers['attacker'] = function(msg)
     if State.attackers[msg.id] == nil then
-        State.attackers[msg.id] = { nick = msg.nick, time = os.time() + 120 }
-        lua_thread.create(GameLogic.flashPlayer, msg.id)
+        if not msg.is_done then
+            State.attackers[msg.id] = { nick = msg.nick, time = os.time() + 120 }
+            lua_thread.create(GameLogic.flashPlayer, msg.id)
+        end
     else
         if msg.is_done then
             State.attackers[msg.id] = nil
