@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2501202605")
+script_version("2501202606")
 
 -- БИБЛИОТЕКИ
 local se = require 'lib.samp.events'
@@ -195,7 +195,12 @@ PacketHandlers['online'] = function(msg)
         local afk = ""
         local wlow = ""
         if sampIsPlayerPaused(v.id) then afk = " {34C924}< AFK >" end
-        if v.wlow > 0 then wlow = string.format(" {FF2222}В РОЗЫСКЕ: {FFFFFF}%d зв", v.wlow) end
+        if v.wlow.us > 0 or v.wlow.af > 0 or v.wlow.rc > 0 or v.wlow.int > 0 then wlow = string.format(" {FF2222}В РОЗЫСКЕ:", v.wlow.us) end
+        for st, wlow_num in pairs(v.wlow) do
+            if wlow_num > 0 then
+                wlow = wlow .. string.format(" {D8A903}%s: {FFFFFF}%d", string.upper(st), wlow_num)
+            end
+        end
         sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow), 0xFFFFFF)
     end
 end
@@ -331,11 +336,28 @@ end
 
 function se.onShowDialog(id, style, title, btn1, btn2, text)
 	if State.send_wlow and title:find("{34C924}Информация о вашем розыске") then
-		local total_stars = 0
-		for count in text:gmatch("розыск %- (%d+)") do
-		    total_stars = total_stars + tonumber(count)
-		end
-        Network.send("wlow", { wlow = total_stars })
+        local stars_us = 0
+        local stars_af = 0
+        local stars_rc = 0
+        local stars_int = 0
+
+        for country, count in clean_text:gmatch("Розыск по (%u+) %- (%d+)") do
+            local amount = tonumber(count)
+            
+            if country == "US" then
+                stars_us = stars_us + amount
+            elseif country == "AF" then
+                stars_af = stars_af + amount
+            elseif country == "RC" then
+                stars_rc = stars_rc + amount
+            end
+        end
+
+        for count in clean_text:gmatch("Международный розыск %- (%d+)") do
+            stars_int = stars_int + tonumber(count)
+        end
+
+        Network.send("wlow", { us = stars_us, af = stars_af, rc = stars_rc, int = stars_int })
         State.send_wlow = false
 		sampSendDialogResponse(id, 1, -1, -1)
 		return false
