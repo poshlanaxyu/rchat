@@ -393,7 +393,7 @@ function main()
         local now = os.clock()
         if State.connected then
             Network.receive()
-            if now - State.last_ping > CFG.PING_INTERVAL then Network.send("ping"); State.last_ping = now end
+            if now - State.last_ping > CFG.PING_INTERVAL then Network.send("ping", {id = Utils.getPlayerId(), nick = Utils.getPlayerNick()}); State.last_ping = now end
             if now - State.last_wlow > CFG.WLOW_INTERVAL then
                 if not sampIsDialogActive() then
                     State.send_wlow = true
