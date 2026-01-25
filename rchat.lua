@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2501202606")
+script_version("2501202607")
 
 -- ÁÈÁËÈÎÒÅÊÈ
 local se = require 'lib.samp.events'
@@ -17,7 +17,7 @@ local CFG = {
     GPS_INTERVAL = 0.1,    
     PING_INTERVAL = 1.0,   
     RECONNECT_DELAY = 1.0,
-    WLOW_INTERVAL = 60.0,
+    WLOW_INTERVAL = 10.0,
     DEBUG = false
 }
 
@@ -27,7 +27,7 @@ local State = {
     connected = false,
     last_ping = 0,
     last_gps = 0,
-    last_wlow = os.clock(),
+    last_wlow = 0,
     last_reconnect = 0,
     gps_enabled = true,
     gps_store = {},    
@@ -198,7 +198,7 @@ PacketHandlers['online'] = function(msg)
         if v.wlow.us > 0 or v.wlow.af > 0 or v.wlow.rc > 0 or v.wlow.int > 0 then wlow = string.format(" {FF2222}Â ÐÎÇÛÑÊÅ:", v.wlow.us) end
         for st, wlow_num in pairs(v.wlow) do
             if wlow_num > 0 then
-                wlow = wlow .. string.format(" {D8A903}%s: {FFFFFF}%d", string.upper(st), wlow_num)
+                wlow = wlow .. string.format(" %s: %d", string.upper(st), wlow_num)
             end
         end
         sampAddChatMessage(string.format("Íèê: {abcdef}%s - %s {ffffff}Ðàíã:{fbec5d} %s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow), 0xFFFFFF)
@@ -391,8 +391,8 @@ function main()
         if State.connected then
             Network.receive()
             if now - State.last_ping > CFG.PING_INTERVAL then Network.send("ping"); State.last_ping = now end
-            if now - State.last_wlow > CFG.WLOW_INTERVAL and not State.send_wlow then
-                if not sampIsDialogActive() and not sampIsChatInputActive() and not isSampfuncsConsoleActive() then
+            if now - State.last_wlow > CFG.WLOW_INTERVAL then
+                if not sampIsDialogActive() then
                     State.send_wlow = true
                     sampSendChat("/wlow")
                     State.last_wlow = now
