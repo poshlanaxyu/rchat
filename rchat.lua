@@ -404,6 +404,8 @@ function main()
                 local x, y, z = getCharCoordinates(PLAYER_PED)
                 if getActiveInterior() == 0 then
                     Network.send("gps", { x=x, y=y, z=z, color=Utils.argb_to_rgba(sampGetPlayerColor(Utils.getPlayerId())), disabled=isPlayerDead(PLAYER_PED) })
+                else
+                    GameLogic.clearGPS()
                 end
                 State.last_gps = now
             end
