@@ -401,6 +401,12 @@ function main()
                 end
             end
             if now - State.last_gps > CFG.GPS_INTERVAL then
+                for id, _ in pairs(State.gps_store) do
+                    if not sampIsPlayerConnected(id) then
+                        removeBlip(State.gps_store[id].blip)
+                        State.gps_store[id] = nil
+                    end
+                end
                 local x, y, z = getCharCoordinates(PLAYER_PED)
                 if getActiveInterior() == 0 then
                     Network.send("gps", { x=x, y=y, z=z, color=Utils.argb_to_rgba(sampGetPlayerColor(Utils.getPlayerId())), disabled=isPlayerDead(PLAYER_PED) })
