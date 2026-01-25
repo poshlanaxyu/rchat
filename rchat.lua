@@ -239,6 +239,7 @@ function GameLogic.updateBlip(data)
     end
     if State.gps_store[pid] then
         setBlipCoordinates(State.gps_store[pid].blip, data.x, data.y, data.z)
+        changeBlipColour(State.gps_store[pid].blip, data.color or 0xFFFFFF)
     else
         local blip = addSpriteBlipForCoord(data.x, data.y, data.z, 0)
         changeBlipScale(blip, 2)
