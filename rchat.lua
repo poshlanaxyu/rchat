@@ -341,7 +341,7 @@ function se.onShowDialog(id, style, title, btn1, btn2, text)
         local stars_rc = 0
         local stars_int = 0
 
-        for country, count in clean_text:gmatch("Розыск по (%u+) %- (%d+)") do
+        for country, count in text:gmatch("Розыск по (%u+) %- (%d+)") do
             local amount = tonumber(count)
             
             if country == "US" then
@@ -353,7 +353,7 @@ function se.onShowDialog(id, style, title, btn1, btn2, text)
             end
         end
 
-        for count in clean_text:gmatch("Международный розыск %- (%d+)") do
+        for count in text:gmatch("Международный розыск %- (%d+)") do
             stars_int = stars_int + tonumber(count)
         end
 
