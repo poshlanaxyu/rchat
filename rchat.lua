@@ -401,7 +401,7 @@ function main()
                     State.last_wlow = now
                 end
             end
-            if now - State.last_gps > CFG.GPS_INTERVAL and sampIsPlayerConnected(Utils.getPlayerId()) then
+            if now - State.last_gps > CFG.GPS_INTERVAL then
                 for id, _ in pairs(State.gps_store) do
                     if not sampIsPlayerConnected(id) then
                         removeBlip(State.gps_store[id].blip)
