@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2501202607")
+script_version("2501202608")
 
 -- ахакхнрейх
 local se = require 'lib.samp.events'
