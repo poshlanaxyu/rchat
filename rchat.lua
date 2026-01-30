@@ -1,7 +1,7 @@
 script_name("RdugChat")
 script_version("2501202609")
 
--- БИБЛИОТЕКИ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 local se = require 'lib.samp.events'
 local socket = require 'socket'
 local cjson = require 'cjson'
@@ -9,11 +9,11 @@ local encoding = require("encoding")
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
 
--- КОНФИГУРАЦИЯ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 local CFG = {
     HOST = "103.54.19.207",
     PORT = 18310,
-    SECRET_KEY = "TEMPKEY1488228_PATOM_POMENYAEM",
+    SECRET_KEY = "RdugChat_2025_ESP_GPS_System_Secure_v3.0"
     GPS_INTERVAL = 0.1,    
     PING_INTERVAL = 1.0,   
     RECONNECT_DELAY = 1.0,
@@ -21,7 +21,7 @@ local CFG = {
     DEBUG = false
 }
 
--- СОСТОЯНИЕ
+-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 local State = {
     tcp = nil,
     connected = false,
@@ -36,11 +36,11 @@ local State = {
     send_wlow = false
 }
 
--- === КРИПТОГРАФИЯ (RC4 + Base64) ===
+-- === пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (RC4 + Base64) ===
 
 local b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 function enc_base64(data)
-    return ((data:gsub('.', function(x) 
+    return ((data:gsub('.', function(x)
         local r,b='',x:byte()
         for i=8,1,-1 do r=r..(b%2^i-b%2^(i-1)>0 and '1' or '0') end
         return r;
@@ -88,13 +88,17 @@ function rc4(key, data)
     return table.concat(res)
 end
 
--- === УТИЛИТЫ ===
+-- === пїЅпїЅпїЅпїЅпїЅпїЅпїЅ ===
 
 local Utils = {}
 function Utils.getPlayerId() return select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) end
 function Utils.getPlayerNick() return sampGetPlayerNickname(Utils.getPlayerId()) end
-function Utils.argb_to_rgba(argb) return bit.bor(bit.lshift(bit.band(bit.rshift(argb, 16), 0xFF), 24), bit.lshift(bit.band(bit.rshift(argb, 8), 0xFF), 16), bit.lshift(bit.band(argb, 0xFF), 8), bit.band(bit.rshift(argb, 24), 0xFF)) end
-function Utils.hex_color(int_color) return string.format('%06X', bit.band(int_color, 0xFFFFFF)) end
+function Utils.argb_to_rgba(argb)
+    return bit.bor(bit.lshift(bit.band(bit.rshift(argb, 24), 0xFF), 24),  -- Alpha
+                  bit.lshift(bit.band(bit.rshift(argb, 16), 0xFF), 16),  -- Red
+                  bit.lshift(bit.band(bit.rshift(argb, 8), 0xFF), 8),   -- Green
+                  bit.band(argb, 0xFF))                               -- Blue
+end
 function Utils.getAllSampPlayers()
     players = {}
     for i = 0, sampGetMaxPlayerId() do
@@ -104,7 +108,7 @@ function Utils.getAllSampPlayers()
     end
     return players
 end
--- === СЕТЬ ===
+-- === пїЅпїЅпїЅпїЅ ===
 
 local Network = {}
 
@@ -117,7 +121,7 @@ function Network.connect()
     if res then
         State.tcp:settimeout(0) 
         State.connected = true
-        sampAddChatMessage("RdugChat: Подключено!", 0x00FF00) -- ОРИГИНАЛ
+        sampAddChatMessage("RdugChat: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ!", 0x00FF00) -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         if not CFG.DEBUG then
             Network.send("login", {
                 version = thisScript().version,
@@ -131,7 +135,7 @@ function Network.connect()
 end
 
 function Network.disconnect()
-    if State.connected then sampAddChatMessage("RdugChat: Потеря соединения...", 0xFF0000) end -- ОРИГИНАЛ
+    if State.connected then sampAddChatMessage("RdugChat: пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ...", 0xFF0000) end -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     State.connected = false
     if State.tcp then State.tcp:close() end
     State.tcp = nil
@@ -139,7 +143,7 @@ function Network.disconnect()
 end
 
 function Network.send(type, data)
-    if not State.connected or not State.tcp then return end
+if not State.connected or not State.tcp then return false end
     data = data or {}
     data.type = type
     
@@ -149,14 +153,14 @@ function Network.send(type, data)
     local encrypted = rc4(CFG.SECRET_KEY, json_str)
     local b64 = enc_base64(encrypted)
     
-    local _, err = State.tcp:send(b64 .. "\n")
-    if err then
+local success, err = State.tcp:send(b64 .. "\n")
+if not success or err then
         if err == "closed" or err == "broken pipe" then Network.disconnect() end
     end
 end
 
 function Network.receive()
-    if not State.connected or not State.tcp then return end
+if not State.connected or not State.tcp then return false end
     while true do
         local line, err = State.tcp:receive('*l')
         if not line then
@@ -172,36 +176,36 @@ function Network.receive()
     end
 end
 
--- === ОБРАБОТЧИКИ ПАКЕТОВ ===
+-- === пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ ===
 
 PacketHandlers = {}
 function PacketHandlers.dispatch(msg) if PacketHandlers[msg.type] then PacketHandlers[msg.type](msg) end end
 
 PacketHandlers['system'] = function(msg) 
-    -- ОРИГИНАЛ: 0xfbec5d (желтоватый), а не серый
+    -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: 0xfbec5d (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ), пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
     sampAddChatMessage(u8:decode(msg.text), 0xfbec5d) 
 end
 
 PacketHandlers['chat'] = function(msg)
-    -- ОРИГИНАЛ: 0xfbec5d по дефолту
+    -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: 0xfbec5d пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     local hexColor = msg.color or 0xfbec5d
     sampAddChatMessage(string.format("%s[%s]: %s", msg.nick, msg.id, u8:decode(msg.text)), hexColor)
 end
 
 PacketHandlers['online'] = function(msg)
-    -- ОРИГИНАЛ
-    sampAddChatMessage("Члены подвального чата онлайн, всего {D8A903}" .. #msg.clients .. "{FFFFFF} человек:", 0xFFFFFF)
+    -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+    sampAddChatMessage("пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ {D8A903}" .. #msg.clients .. "{FFFFFF} пїЅпїЅпїЅпїЅпїЅпїЅпїЅ:", 0xFFFFFF)
     for _, v in ipairs(msg.clients) do
         local afk = ""
         local wlow = ""
         if sampIsPlayerPaused(v.id) then afk = " {34C924}< AFK >" end
-        if v.wlow.us > 0 or v.wlow.af > 0 or v.wlow.rc > 0 or v.wlow.int > 0 then wlow = string.format(" {FF2222}В РОЗЫСКЕ:", v.wlow.us) end
+        if v.wlow.us > 0 or v.wlow.af > 0 or v.wlow.rc > 0 or v.wlow.int > 0 then wlow = string.format(" {FF2222}пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ:", v.wlow.us) end
         for st, wlow_num in pairs(v.wlow) do
             if wlow_num > 0 then
                 wlow = wlow .. string.format(" %s: %d", string.upper(st), wlow_num)
             end
         end
-        sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow), 0xFFFFFF)
+        sampAddChatMessage(string.format("пїЅпїЅпїЅ: {abcdef}%s - %s {ffffff}пїЅпїЅпїЅпїЅ:{fbec5d} %s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow), 0xFFFFFF)
     end
 end
 
@@ -225,7 +229,7 @@ PacketHandlers['attacker'] = function(msg)
     end
 end
 
--- === ИГРОВАЯ ЛОГИКА ===
+-- === пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ ===
 
 GameLogic = {}
 function GameLogic.updateBlip(data)
@@ -269,17 +273,17 @@ function Network.setPlayerColor(id, col)
 end
 
 function se.onServerMessage(color, message)
-	if message:find("{FF4500} начал ваше задержание.") or message:find("{FF4500} начала ваше задержание.") then
+	if message:find("{FF4500} пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.") or message:find("{FF4500} пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.") then
 		State.is_z = true
 		Network.send("chat", { text = u8(message), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
 	end
 
-	if message:find("{FF4500} остановила ваше задержание.") or message:find("{FF4500} остановил ваше задержание.") or message:find("Вас не успели задержать сотрудники ПО. В ближайшие {33aa33}") then
+	if message:find("{FF4500} пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.") or message:find("{FF4500} пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.") or message:find("пїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ. пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ {33aa33}") then
 		State.is_z = false
 		Network.send("chat", { text = u8(message), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
 	end
 
-    if State.send_wlow and message:find("Вы не находитесь в розыске.") then
+    if State.send_wlow and message:find("пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.") then
         Network.send("wlow", { us = 0, af = 0, rc = 0, int = 0 })
         State.send_wlow = false
         return false
@@ -319,10 +323,10 @@ function se.onShowTextDraw(id, data)
 		end
 	end
 
-    -- ОРИГИНАЛЬНАЯ СТРОКА ДЛЯ ТРИНИТИ
-    if data.text:find("HA ‹AC HAЊA‡ …‚POK ~r~") then
+    -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+    if data.text:find("HA пїЅAC HAпїЅAпїЅ пїЅпїЅPOK ~r~") then
 
-        local attacker_name = data.text:gsub(".*HA ‹AC HAЊA‡ …‚POK ~r~",""):gsub("~w~.~n~.*","")
+        local attacker_name = data.text:gsub(".*HA пїЅAC HAпїЅAпїЅ пїЅпїЅPOK ~r~",""):gsub("~w~.~n~.*","")
         for id, name in pairs(Utils.getAllSampPlayers()) do
             if string.lower(name):find(string.lower(attacker_name)) then
                 if not State.attackers[id] then
@@ -330,7 +334,7 @@ function se.onShowTextDraw(id, data)
                     State.attackers[id] = { nick = name, time = os.time() + 120 }
                     lua_thread.create(GameLogic.flashPlayer, id)
                     Network.send("attacker", { id = id, nick = name, color = Utils.hex_color(color), is_done = false })
-                    Network.send("chat", { text = u8("{FF6666}!!! Оборона по {"..Utils.hex_color(color).."}"..name.." ["..id.."]"), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
+                    Network.send("chat", { text = u8("{FF6666}!!! пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ {"..Utils.hex_color(color).."}"..name.." ["..id.."]"), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
                 end
             end
         end
@@ -338,13 +342,13 @@ function se.onShowTextDraw(id, data)
 end
 
 function se.onShowDialog(id, style, title, btn1, btn2, text)
-	if State.send_wlow and title:find("{34C924}Информация о вашем розыске") then
+	if State.send_wlow and title:find("{34C924}пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ") then
         local stars_us = 0
         local stars_af = 0
         local stars_rc = 0
         local stars_int = 0
 
-        for country, count in text:gmatch("Розыск по (%u+) %- (%d+)") do
+        for country, count in text:gmatch("пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ (%u+) %- (%d+)") do
             local amount = tonumber(count)
             
             if country == "US" then
@@ -356,7 +360,7 @@ function se.onShowDialog(id, style, title, btn1, btn2, text)
             end
         end
 
-        for count in text:gmatch("Международный розыск %- (%d+)") do
+        for count in text:gmatch("пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ %- (%d+)") do
             stars_int = stars_int + tonumber(count)
         end
 
@@ -372,18 +376,18 @@ function main()
     if not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
     
-    sampAddChatMessage("RdugChat: /u [текст].", 0xAAAAAA) -- ОРИГИНАЛ
+    sampAddChatMessage("RdugChat: /u [пїЅпїЅпїЅпїЅпїЅ].", 0xAAAAAA) -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     
     sampRegisterChatCommand("u", function(arg)
         if #arg > 0 then
-            Network.send("chat", { text = u8(arg), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() }) else sampAddChatMessage("Используйте: /u [текст]", -1)
+            Network.send("chat", { text = u8(arg), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() }) else sampAddChatMessage("пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: /u [пїЅпїЅпїЅпїЅпїЅ]", -1)
         end
     end)
     sampRegisterChatCommand("ugps", function() 
         State.gps_enabled = not State.gps_enabled
         if not State.gps_enabled then GameLogic.clearGPS() end
-        -- ОРИГИНАЛ
-        sampAddChatMessage(State.gps_enabled and "[РДУГ] {FFFFFF}GPS включен!" or "[РДУГ] {FFFFFF}GPS отключен!", 0xfbec5d) 
+        -- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+        sampAddChatMessage(State.gps_enabled and "[пїЅпїЅпїЅпїЅ] {FFFFFF}GPS пїЅпїЅпїЅпїЅпїЅпїЅпїЅ!" or "[пїЅпїЅпїЅпїЅ] {FFFFFF}GPS пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ!", 0xfbec5d) 
     end)
     sampRegisterChatCommand("ulist", function() Network.send("online") end)
     
@@ -413,6 +417,7 @@ function main()
                     Network.send("gps", { x=x, y=y, z=z, color=Utils.argb_to_rgba(sampGetPlayerColor(Utils.getPlayerId())), disabled=isPlayerDead(PLAYER_PED) })
                 end
                 State.last_gps = now
+                wait(1000)
             end
         else
             if now - State.last_reconnect > CFG.RECONNECT_DELAY then Network.connect(); State.last_reconnect = now end
