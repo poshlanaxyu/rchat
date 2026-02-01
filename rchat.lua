@@ -11,7 +11,7 @@ local u8 = encoding.UTF8
 
 -- КОНФИГУРАЦИЯ
 local CFG = {
-    HOST = "103.54.19.207",
+    HOST = "127.0.0.1",
     PORT = 18310,
     SECRET_KEY = "TEMPKEY1488228_PATOM_POMENYAEM",
     GPS_INTERVAL = 0.1,    
@@ -424,7 +424,7 @@ function main()
     sampRegisterChatCommand("urank", function(arg)
         local id, rank = arg:match("(%d+)%s+(.+)")
         if id and rank then
-            Network.send("admin_cmd", { cmd = "urank", target = id, value = rank })
+            Network.send("admin_cmd", { cmd = "urank", target = id, value = u8(rank) })
         else
             sampAddChatMessage("Используйте: /urank [id] [rank]", -1)
         end
@@ -434,7 +434,7 @@ function main()
         if #arg > 0 then
             Network.send("admin_cmd", { cmd = "uban", target = arg })
         else
-            sampAddChatMessage("Используйте: /uban [id/uuid]", -1)
+            sampAddChatMessage("Используйте: /uban [id/full_name/uuid]", -1)
         end
     end)
 
@@ -442,7 +442,7 @@ function main()
         if #arg > 0 then
             Network.send("admin_cmd", { cmd = "unban", target = arg })
         else
-            sampAddChatMessage("Используйте: /unban [id/uuid]", -1)
+            sampAddChatMessage("Используйте: /unban [id/full_name/uuid]", -1)
         end
     end)
     
