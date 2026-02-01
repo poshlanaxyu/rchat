@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("2501202609")
+script_version("0102202601")
 
 -- БИБЛИОТЕКИ
 local se = require 'lib.samp.events'
@@ -11,7 +11,7 @@ local u8 = encoding.UTF8
 
 -- КОНФИГУРАЦИЯ
 local CFG = {
-    HOST = "103.54.19.207",
+    HOST = "103.54.19.20",
     PORT = 18310,
     SECRET_KEY = "TEMPKEY1488228_PATOM_POMENYAEM",
     GPS_INTERVAL = 0.1,    
@@ -91,6 +91,39 @@ end
 -- === УТИЛИТЫ ===
 
 local Utils = {}
+
+function Utils.generateUUID()
+    math.randomseed(os.time() + os.clock() * 1000)
+    local template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+    return string.gsub(template, '[xy]', function (c)
+        local v = (c == 'x') and math.random(0, 0xf) or math.random(8, 0xb)
+        return string.format('%x', v)
+    end)
+end
+
+function Utils.getUUID()
+    local path = getWorkingDirectory() .. "\\config\\uuid.json"
+    if not doesDirectoryExist(getWorkingDirectory() .. "\\config") then
+        createDirectory(getWorkingDirectory() .. "\\config")
+    end
+    if doesFileExist(path) then
+        local f = io.open(path, "r")
+        if f then
+            local content = f:read("*a")
+            f:close()
+            local status, data = pcall(cjson.decode, content)
+            if status and data.uuid then return data.uuid end
+        end
+    end
+    local new_uuid = Utils.generateUUID()
+    local f = io.open(path, "w")
+    if f then
+        f:write(cjson.encode({uuid = new_uuid}))
+        f:close()
+    end
+    return new_uuid
+end
+
 function Utils.getPlayerId() return select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) end
 function Utils.getPlayerNick() return sampGetPlayerNickname(Utils.getPlayerId()) end
 function Utils.argb_to_rgba(argb) return bit.bor(bit.lshift(bit.band(bit.rshift(argb, 16), 0xFF), 24), bit.lshift(bit.band(bit.rshift(argb, 8), 0xFF), 16), bit.lshift(bit.band(argb, 0xFF), 8), bit.band(bit.rshift(argb, 24), 0xFF)) end
@@ -123,6 +156,7 @@ function Network.connect()
                 version = thisScript().version,
                 nick = Utils.getPlayerNick(),
                 id = Utils.getPlayerId(),
+                uuid = Utils.getUUID(),
             })
         end
     else
@@ -183,9 +217,9 @@ PacketHandlers['system'] = function(msg)
 end
 
 PacketHandlers['chat'] = function(msg)
-    -- ОРИГИНАЛ: 0xfbec5d по дефолту
+    -- Сервер присылает готовое форматированное сообщение в msg.text
     local hexColor = msg.color or 0xfbec5d
-    sampAddChatMessage(string.format("%s[%s]: %s", msg.nick, msg.id, u8:decode(msg.text)), hexColor)
+    sampAddChatMessage(u8:decode(msg.text), hexColor)
 end
 
 PacketHandlers['online'] = function(msg)
@@ -386,6 +420,31 @@ function main()
         sampAddChatMessage(State.gps_enabled and "[РДУГ] {FFFFFF}GPS включен!" or "[РДУГ] {FFFFFF}GPS отключен!", 0xfbec5d) 
     end)
     sampRegisterChatCommand("ulist", function() Network.send("online") end)
+    
+    sampRegisterChatCommand("urank", function(arg)
+        local id, rank = arg:match("(%d+)%s+(.+)")
+        if id and rank then
+            Network.send("admin_cmd", { cmd = "urank", target = id, value = u8(rank) })
+        else
+            sampAddChatMessage("Используйте: /urank [id] [rank]", -1)
+        end
+    end)
+
+    sampRegisterChatCommand("uban", function(arg)
+        if #arg > 0 then
+            Network.send("admin_cmd", { cmd = "uban", target = arg })
+        else
+            sampAddChatMessage("Используйте: /uban [id/full_name/uuid]", -1)
+        end
+    end)
+
+    sampRegisterChatCommand("unban", function(arg)
+        if #arg > 0 then
+            Network.send("admin_cmd", { cmd = "unban", target = arg })
+        else
+            sampAddChatMessage("Используйте: /unban [id/full_name/uuid]", -1)
+        end
+    end)
     
     Network.connect()
     while true do
