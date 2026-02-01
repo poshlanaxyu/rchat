@@ -91,6 +91,39 @@ end
 -- === УТИЛИТЫ ===
 
 local Utils = {}
+
+function Utils.generateUUID()
+    math.randomseed(os.time() + os.clock() * 1000)
+    local template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+    return string.gsub(template, '[xy]', function (c)
+        local v = (c == 'x') and math.random(0, 0xf) or math.random(8, 0xb)
+        return string.format('%x', v)
+    end)
+end
+
+function Utils.getUUID()
+    local path = getWorkingDirectory() .. "\\config\\uuid.json"
+    if not doesDirectoryExist(getWorkingDirectory() .. "\\config") then
+        createDirectory(getWorkingDirectory() .. "\\config")
+    end
+    if doesFileExist(path) then
+        local f = io.open(path, "r")
+        if f then
+            local content = f:read("*a")
+            f:close()
+            local status, data = pcall(cjson.decode, content)
+            if status and data.uuid then return data.uuid end
+        end
+    end
+    local new_uuid = Utils.generateUUID()
+    local f = io.open(path, "w")
+    if f then
+        f:write(cjson.encode({uuid = new_uuid}))
+        f:close()
+    end
+    return new_uuid
+end
+
 function Utils.getPlayerId() return select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) end
 function Utils.getPlayerNick() return sampGetPlayerNickname(Utils.getPlayerId()) end
 function Utils.argb_to_rgba(argb) return bit.bor(bit.lshift(bit.band(bit.rshift(argb, 16), 0xFF), 24), bit.lshift(bit.band(bit.rshift(argb, 8), 0xFF), 16), bit.lshift(bit.band(argb, 0xFF), 8), bit.band(bit.rshift(argb, 24), 0xFF)) end
@@ -123,6 +156,7 @@ function Network.connect()
                 version = thisScript().version,
                 nick = Utils.getPlayerNick(),
                 id = Utils.getPlayerId(),
+                uuid = Utils.getUUID(),
             })
         end
     else
@@ -183,9 +217,9 @@ PacketHandlers['system'] = function(msg)
 end
 
 PacketHandlers['chat'] = function(msg)
-    -- ОРИГИНАЛ: 0xfbec5d по дефолту
+    -- Сервер присылает готовое форматированное сообщение в msg.text
     local hexColor = msg.color or 0xfbec5d
-    sampAddChatMessage(string.format("%s[%s]: %s", msg.nick, msg.id, u8:decode(msg.text)), hexColor)
+    sampAddChatMessage(u8:decode(msg.text), hexColor)
 end
 
 PacketHandlers['online'] = function(msg)
