@@ -421,6 +421,31 @@ function main()
     end)
     sampRegisterChatCommand("ulist", function() Network.send("online") end)
     
+    sampRegisterChatCommand("urank", function(arg)
+        local id, rank = arg:match("(%d+)%s+(.+)")
+        if id and rank then
+            Network.send("admin_cmd", { cmd = "urank", target = id, value = rank })
+        else
+            sampAddChatMessage("Используйте: /urank [id] [rank]", -1)
+        end
+    end)
+
+    sampRegisterChatCommand("uban", function(arg)
+        if #arg > 0 then
+            Network.send("admin_cmd", { cmd = "uban", target = arg })
+        else
+            sampAddChatMessage("Используйте: /uban [id/uuid]", -1)
+        end
+    end)
+
+    sampRegisterChatCommand("unban", function(arg)
+        if #arg > 0 then
+            Network.send("admin_cmd", { cmd = "unban", target = arg })
+        else
+            sampAddChatMessage("Используйте: /unban [id/uuid]", -1)
+        end
+    end)
+    
     Network.connect()
     while true do
         wait(0)
