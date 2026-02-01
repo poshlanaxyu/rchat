@@ -11,7 +11,7 @@ local u8 = encoding.UTF8
 
 --  ŒÕ‘»√”–¿÷»ﬂ
 local CFG = {
-    HOST = "103.54.19.20",
+    HOST = "103.54.19.207",
     PORT = 18310,
     SECRET_KEY = "TEMPKEY1488228_PATOM_POMENYAEM",
     GPS_INTERVAL = 0.1,    
