@@ -1,11 +1,12 @@
 script_name("RdugChat")
-script_version("0502202601")
+script_version("0502202602")
 
 -- БИБЛИОТЕКИ
 local se = require 'lib.samp.events'
 local socket = require 'socket'
 local cjson = require 'cjson'
 local encoding = require("encoding")
+local lmemory, memory = pcall(require, 'memory')
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
 
@@ -33,7 +34,8 @@ local State = {
     gps_store = {},    
     attackers = {},   
     is_z = false,
-    send_wlow = false
+    send_wlow = false,
+    fraps_mode = false
 }
 
 -- === КРИПТОГРАФИЯ (RC4 + Base64) ===
@@ -99,6 +101,12 @@ function Utils.generateUUID()
         local v = (c == 'x') and math.random(0, 0xf) or math.random(8, 0xb)
         return string.format('%x', v)
     end)
+end
+
+function Utils.cc()
+    memory.fill(sampGetChatInfoPtr() + 306, 0x0, 25200)
+    memory.write(sampGetChatInfoPtr() + 306, 25562, 4, 0x0)
+    memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
 end
 
 function Utils.getUUID()
@@ -213,12 +221,14 @@ function PacketHandlers.dispatch(msg) if PacketHandlers[msg.type] then PacketHan
 
 PacketHandlers['system'] = function(msg) 
     -- ОРИГИНАЛ: 0xfbec5d (желтоватый), а не серый
+    if State.fraps_mode then return end
     sampAddChatMessage(u8:decode(msg.text), 0xfbec5d) 
 end
 
 PacketHandlers['chat'] = function(msg)
     -- Сервер присылает готовое форматированное сообщение в msg.text
     local hexColor = msg.color or 0xfbec5d
+    if State.fraps_mode then return end
     sampAddChatMessage(u8:decode(msg.text), hexColor)
 end
 
@@ -450,6 +460,28 @@ function main()
             Network.send("admin_cmd", { cmd = "unban", target = arg })
         else
             sampAddChatMessage("Используйте: /unban [id/full_name/uuid]", -1)
+        end
+    end)
+
+    sampRegisterChatCommand("ufraps", function() 
+        State.fraps_mode = not State.fraps_mode
+        if State.fraps_mode then
+            Network.send("chat", { text = u8("{FFFFFF}Fraps on"), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
+            Utils.cc()
+        else
+            Network.send("chat", { text = u8("{FFFFFF}Fraps off"), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
+            sampAddChatMessage("[РДУГ] {FFFFFF}Фрапсмод отключен!", 0xfbec5d)
+        end
+    end)
+
+    sampRegisterChatCommand("fraps", function() 
+        State.fraps_mode = not State.fraps_mode
+        if State.fraps_mode then
+            Network.send("chat", { text = u8("{FFFFFF}Fraps on"), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
+            Utils.cc()
+        else
+            Network.send("chat", { text = u8("{FFFFFF}Fraps off"), nick = Utils.getPlayerNick(), id = Utils.getPlayerId() })
+            sampAddChatMessage("[РДУГ] {FFFFFF}Фрапсмод отключен!", 0xfbec5d)
         end
     end)
     
