@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("0102202601")
+script_version("0502202601")
 
 -- Ѕ»ЅЋ»ќ“≈ »
 local se = require 'lib.samp.events'
@@ -372,6 +372,13 @@ function se.onShowTextDraw(id, data)
 end
 
 function se.onShowDialog(id, style, title, btn1, btn2, text)
+    if State.send_wlow and title:find("јрхив розыска") then
+        Network.send("wlow", { us = 0, af = 0, rc = 0, int = 0 })
+        State.send_wlow = false
+		sampSendDialogResponse(id, 1, -1, -1)
+		return false
+    end
+
 	if State.send_wlow and title:find("{34C924}»нформаци€ о вашем розыске") then
         local stars_us = 0
         local stars_af = 0
