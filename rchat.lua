@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("0502202602")
+script_version("0207202601")
 
 -- ÁÈÁËÈÎÒÅÊÈ
 local se = require 'lib.samp.events'
@@ -12,7 +12,7 @@ local u8 = encoding.UTF8
 
 -- ÊÎÍÔÈÃÓĞÀÖÈß
 local CFG = {
-    HOST = "199.189.249.206",
+    HOST = "chat.rdug.bet",
     PORT = 18310,
     SECRET_KEY = "TEMPKEY1488228_PATOM_POMENYAEM",
     GPS_INTERVAL = 0.1,    
@@ -149,12 +149,44 @@ end
 
 local Network = {}
 
+function Network.resolveHost()
+    if not socket.dns then return CFG.HOST end
+
+    local err = nil
+    if socket.dns.getaddrinfo then
+        local addrinfo, getaddrinfo_err = socket.dns.getaddrinfo(CFG.HOST)
+        err = getaddrinfo_err
+        if addrinfo then
+            for _, alt in ipairs(addrinfo) do
+                if alt.family == "inet" and alt.addr then
+                    return alt.addr
+                end
+            end
+        end
+    end
+
+    if socket.dns.toip then
+        local ip, toip_err = socket.dns.toip(CFG.HOST)
+        if ip then return ip end
+        err = err or toip_err
+    end
+
+    return CFG.HOST, err
+end
+
 function Network.connect()
     if State.tcp then State.tcp:close() end
+    State.connected = false
+
+    local host, resolve_err = Network.resolveHost()
+    if CFG.DEBUG and resolve_err then
+        print("DNS warning for " .. CFG.HOST .. ": " .. tostring(resolve_err))
+    end
+
     State.tcp = socket.tcp()
     State.tcp:settimeout(0.2)
     
-    local res, err = State.tcp:connect(CFG.HOST, CFG.PORT)
+    local res, err = State.tcp:connect(host, CFG.PORT)
     if res then
         State.tcp:settimeout(0) 
         State.connected = true
@@ -168,7 +200,9 @@ function Network.connect()
             })
         end
     else
-        print("Connection failed: " .. tostring(err))
+        print("Connection failed to " .. tostring(host) .. ":" .. tostring(CFG.PORT) .. ": " .. tostring(err))
+        State.tcp:close()
+        State.tcp = nil
     end
 end
 
@@ -434,7 +468,7 @@ function main()
         State.gps_enabled = not State.gps_enabled
         if not State.gps_enabled then GameLogic.clearGPS() end
         -- ÎĞÈÃÈÍÀË
-        sampAddChatMessage(State.gps_enabled and "[ĞÄÓÃ] {FFFFFF}GPS âêëş÷åí!" or "[ĞÄÓÃ] {FFFFFF}GPS îòêëş÷åí!", 0xfbec5d) 
+        sampAddChatMessage(State.gps_enabled and "[ĞÄÓÃ] {FFFFFF}GPS âêëş÷åí!" or "[ĞÄÓÃ] {FFFFFF}GPS îòêëş÷åí!", 0xfbec5d)
     end)
     sampRegisterChatCommand("ulist", function() Network.send("online") end)
     
