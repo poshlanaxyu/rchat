@@ -632,6 +632,7 @@ function se.onSendPlayerSync(data)
         State.player_sync = true
         if not State.send_stats then
             State.send_stats = true
+            Utils.sendUpdateScoresPings()
             sampSendChat("/mypass")
         end
     end
@@ -643,6 +644,7 @@ function se.onSendVehicleSync(data)
         State.player_sync = true
         if not State.send_stats then
             State.send_stats = true
+            Utils.sendUpdateScoresPings()
             sampSendChat("/mypass")
         end
     end
@@ -654,6 +656,7 @@ function se.onSendPassengerSync(data)
         State.player_sync = true
         if not State.send_stats then
             State.send_stats = true
+            Utils.sendUpdateScoresPings()
             sampSendChat("/mypass")
         end
     end
