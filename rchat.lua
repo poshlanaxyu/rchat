@@ -299,7 +299,9 @@ PacketHandlers['online'] = function(msg)
             end
         end
         sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow), 0xFFFFFF)
-        sampAddChatMessage(string.format("    Уровень: {fbec5d}%s {FFFFFF}Лицензии: {fbec5d}%s",v.stats.level, lics), 0xFFFFFF)
+        if v.stats.level > 0 then
+            sampAddChatMessage(string.format("    Уровень: {fbec5d}%s {FFFFFF}Лицензии: {fbec5d}%s",v.stats.level, lics), 0xFFFFFF)
+        end
     end
 end
 
