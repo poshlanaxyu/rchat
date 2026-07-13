@@ -623,7 +623,9 @@ function se.onSendSpawn()
     if not State.send_stats then
         Utils.sendUpdateScoresPings()
         State.send_stats = true
-        sampSendChat("/mypass")
+        if not sampIsDialogActive() then
+            sampSendChat("/mypass")
+        end
     end
     State.gps_send = true
 end
@@ -635,7 +637,9 @@ function se.onSendPlayerSync(data)
         if not State.send_stats then
             State.send_stats = true
             Utils.sendUpdateScoresPings()
-            sampSendChat("/mypass")
+            if not sampIsDialogActive() then
+                sampSendChat("/mypass")
+            end
         end
     end
 end
@@ -647,7 +651,9 @@ function se.onSendVehicleSync(data)
         if not State.send_stats then
             State.send_stats = true
             Utils.sendUpdateScoresPings()
-            sampSendChat("/mypass")
+            if not sampIsDialogActive() then
+                sampSendChat("/mypass")
+            end
         end
     end
 end
@@ -659,7 +665,9 @@ function se.onSendPassengerSync(data)
         if not State.send_stats then
             State.send_stats = true
             Utils.sendUpdateScoresPings()
-            sampSendChat("/mypass")
+            if not sampIsDialogActive() then
+                sampSendChat("/mypass")
+            end
         end
     end
 end
