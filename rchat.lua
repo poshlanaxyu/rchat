@@ -637,7 +637,7 @@ function se.onSendPlayerSync(data)
     end
 end
 
-function sampev.onSendVehicleSync(data)
+function se.onSendVehicleSync(data)
     State.gps_send = true
     if not State.player_sync then
         State.player_sync = true
@@ -648,7 +648,7 @@ function sampev.onSendVehicleSync(data)
     end
 end
 
-function sampev.onSendPassengerSync(data)
+function se.onSendPassengerSync(data)
     State.gps_send = true
     if not State.player_sync then
         State.player_sync = true
