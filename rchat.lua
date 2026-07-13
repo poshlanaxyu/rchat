@@ -150,16 +150,12 @@ function Utils.getAllSampPlayers()
     end
     return players
 end
-
-
-local function sendUpdateScoresPings()
+function Utils.sendUpdateScoresPings()
     local bs = raknetNewBitStream()
-
-    -- RPC 155, payload отсутствует
     raknetSendRpc(raknet.RPC.UPDATESCORESPINGSIPS, bs)
-
     raknetDeleteBitStream(bs)
 end
+
 -- === СЕТЬ ===
 
 local Network = {}
@@ -205,7 +201,7 @@ function Network.connect()
     if res then
         State.tcp:settimeout(0) 
         State.connected = true
-        sampAddChatMessage("RdugChat: Подключено!", 0x00FF00) -- ОРИГИНАЛ
+        sampAddChatMessage("RdugChat: Подключено!", 0x00FF00)
         if not CFG.DEBUG then
             Network.send("login", {
                 version = thisScript().version,
@@ -222,7 +218,7 @@ function Network.connect()
 end
 
 function Network.disconnect()
-    if State.connected then sampAddChatMessage("RdugChat: Потеря соединения...", 0xFF0000) end -- ОРИГИНАЛ
+    if State.connected then sampAddChatMessage("RdugChat: Потеря соединения...", 0xFF0000) end
     State.connected = false
     if State.tcp then State.tcp:close() end
     State.tcp = nil
@@ -269,20 +265,17 @@ PacketHandlers = {}
 function PacketHandlers.dispatch(msg) if PacketHandlers[msg.type] then PacketHandlers[msg.type](msg) end end
 
 PacketHandlers['system'] = function(msg) 
-    -- ОРИГИНАЛ: 0xfbec5d (желтоватый), а не серый
     if State.fraps_mode then return end
     sampAddChatMessage(u8:decode(msg.text), 0xfbec5d) 
 end
 
 PacketHandlers['chat'] = function(msg)
-    -- Сервер присылает готовое форматированное сообщение в msg.text
     local hexColor = msg.color or 0xfbec5d
     if State.fraps_mode then return end
     sampAddChatMessage(u8:decode(msg.text), hexColor)
 end
 
 PacketHandlers['online'] = function(msg)
-    -- ОРИГИНАЛ
     sampAddChatMessage("Члены подвального чата онлайн, всего {D8A903}" .. #msg.clients .. "{FFFFFF} человек:", 0xFFFFFF)
     for _, v in ipairs(msg.clients) do
         local afk = ""
@@ -436,7 +429,6 @@ function se.onShowTextDraw(id, data)
 		end
 	end
 
-    -- ОРИГИНАЛЬНАЯ СТРОКА ДЛЯ ТРИНИТИ
     if data.text:find("HA ‹AC HAЊA‡ …‚POK ~r~") then
 
         local attacker_name = data.text:gsub(".*HA ‹AC HAЊA‡ …‚POK ~r~",""):gsub("~w~.~n~.*","")
@@ -500,7 +492,6 @@ function se.onShowDialog(id, style, title, btn1, btn2, text)
             },
             level = sampGetPlayerScore(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
         }
-        -- ЛИЦЕНЗИЯ НА УПРАВЛЕНИЕ КАТЕРАМИ
 
         if text:find("Водительское") then
             stats.lics.car = true
@@ -518,7 +509,6 @@ function se.onShowDialog(id, style, title, btn1, btn2, text)
         Network.send("stats", stats)
         State.send_stats = false
 
-        sampToggleScoreboard(false)
         sampSendDialogResponse(id, 1, -1, -1)
         return false
     end
@@ -529,7 +519,7 @@ function main()
     if not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
     
-    sampAddChatMessage("RdugChat: /u [текст].", 0xAAAAAA) -- ОРИГИНАЛ
+    sampAddChatMessage("RdugChat: /u [текст].", 0xAAAAAA)
     
     sampRegisterChatCommand("u", function(arg)
         if #arg > 0 then
@@ -539,7 +529,6 @@ function main()
     sampRegisterChatCommand("ugps", function() 
         State.gps_enabled = not State.gps_enabled
         if not State.gps_enabled then GameLogic.clearGPS() end
-        -- ОРИГИНАЛ
         sampAddChatMessage(State.gps_enabled and "[РДУГ] {FFFFFF}GPS включен!" or "[РДУГ] {FFFFFF}GPS отключен!", 0xfbec5d)
     end)
     sampRegisterChatCommand("ulist", function() Network.send("online") end)
@@ -630,7 +619,7 @@ function onScriptTerminate(scr, quit) if scr == thisScript() then if State.tcp t
 
 function se.onSendSpawn()
     if not State.send_stats then
-        sendUpdateScoresPings()
+        Utils.sendUpdateScoresPings()
         State.send_stats = true
         sampSendChat("/mypass")
     end
