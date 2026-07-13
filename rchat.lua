@@ -636,3 +636,25 @@ function se.onSendPlayerSync(data)
         end
     end
 end
+
+function sampev.onSendVehicleSync(data)
+    State.gps_send = true
+    if not State.player_sync then
+        State.player_sync = true
+        if not State.send_stats then
+            State.send_stats = true
+            sampSendChat("/mypass")
+        end
+    end
+end
+
+function sampev.onSendPassengerSync(data)
+    State.gps_send = true
+    if not State.player_sync then
+        State.player_sync = true
+        if not State.send_stats then
+            State.send_stats = true
+            sampSendChat("/mypass")
+        end
+    end
+end
