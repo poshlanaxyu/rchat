@@ -1,18 +1,19 @@
 script_name("RdugChat")
-script_version("1307202601")
+script_version("1307202602")
 
 -- БИБЛИОТЕКИ
 local se = require 'lib.samp.events'
 local socket = require 'socket'
 local cjson = require 'cjson'
 local encoding = require("encoding")
+local raknet = require 'samp.raknet'
 local lmemory, memory = pcall(require, 'memory')
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
 
 -- КОНФИГУРАЦИЯ
 local CFG = {
-    HOST = "chat.rdug.bet",
+    HOST = "127.0.0.1",
     PORT = 18310,
     SECRET_KEY = "TEMPKEY1488228_PATOM_POMENYAEM",
     GPS_INTERVAL = 0.1,    
@@ -31,12 +32,16 @@ local State = {
     last_wlow = 0,
     last_reconnect = 0,
     gps_enabled = true,
+    gps_send = false,
     gps_store = {},    
     attackers = {},   
     is_z = false,
     send_wlow = false,
-    fraps_mode = false
+    fraps_mode = false,
+    player_sync = false
 }
+
+function EXPORTS.getState() return State end
 
 -- === КРИПТОГРАФИЯ (RC4 + Base64) ===
 
@@ -144,6 +149,16 @@ function Utils.getAllSampPlayers()
         end
     end
     return players
+end
+
+
+local function sendUpdateScoresPings()
+    local bs = raknetNewBitStream()
+
+    -- RPC 155, payload отсутствует
+    raknetSendRpc(raknet.RPC.UPDATESCORESPINGSIPS, bs)
+
+    raknetDeleteBitStream(bs)
 end
 -- === СЕТЬ ===
 
@@ -272,6 +287,7 @@ PacketHandlers['online'] = function(msg)
     for _, v in ipairs(msg.clients) do
         local afk = ""
         local wlow = ""
+        local lics = ""
         if sampIsPlayerPaused(v.id) then afk = " {34C924}< AFK >" end
         if v.wlow.us > 0 or v.wlow.af > 0 or v.wlow.rc > 0 or v.wlow.int > 0 then wlow = string.format(" {FF2222}В РОЗЫСКЕ:", v.wlow.us) end
         for st, wlow_num in pairs(v.wlow) do
@@ -279,14 +295,25 @@ PacketHandlers['online'] = function(msg)
                 wlow = wlow .. string.format(" %s: %d", string.upper(st), wlow_num)
             end
         end
+
+        for lic, lic_val in pairs(v.stats.lics) do
+            if lic_val then
+                if lics == "" then
+                    lics = string.upper(lic)
+                else
+                    lics = string.format("%s, %s", lics, string.upper(lic))
+                end
+            end
+        end
         sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow), 0xFFFFFF)
+        sampAddChatMessage(string.format("    Уровень: {fbec5d}%s {FFFFFF}Лицензии: {fbec5d}%s",v.stats.level, lics), 0xFFFFFF)
     end
 end
 
 PacketHandlers['admins'] = function(msg)
     sampAddChatMessage("Админы онлайн, всего {D8A903}" .. #msg.admins .. "{FFFFFF} пидорасов:", 0xFFFFFF)
     for _, v in ipairs(msg.admins) do
-        sampAddChatMessage(string.format("%s[%s]", v.nick, v.id), 0xFFFFFF)
+        sampAddChatMessage(string.format("{fbec5d}[%s] {FFFFFF}%s", v.id, v.nick), 0xfbec5d)
     end
 end
 
@@ -325,11 +352,12 @@ function GameLogic.updateBlip(data)
     if State.gps_store[pid] then
         setBlipCoordinates(State.gps_store[pid].blip, data.x, data.y, data.z)
         changeBlipColour(State.gps_store[pid].blip, data.color or 0xFFFFFF)
+        State.gps_store[pid].pos = { x = data.x, y = data.y, z = data.z }
     else
         local blip = addSpriteBlipForCoord(data.x, data.y, data.z, 0)
         changeBlipScale(blip, 2)
         changeBlipColour(blip, data.color or 0xFFFFFF)
-        State.gps_store[pid] = { blip = blip }
+        State.gps_store[pid] = { blip = blip, pos = { x = data.x, y = data.y, z = data.z } }
     end
 end
 function GameLogic.clearGPS()
@@ -367,6 +395,10 @@ function se.onServerMessage(color, message)
     if State.send_wlow and message:find("Вы не находитесь в розыске.") then
         Network.send("wlow", { us = 0, af = 0, rc = 0, int = 0 })
         State.send_wlow = false
+        return false
+    end
+
+    if (State.send_wlow or State.send_stats) and message:find("Unknown command.") then
         return false
     end
 end
@@ -457,6 +489,39 @@ function se.onShowDialog(id, style, title, btn1, btn2, text)
 		sampSendDialogResponse(id, 1, -1, -1)
 		return false
 	end
+
+    if State.send_stats and title:find("Ваши документы") then
+        local stats = {
+            lics = {
+                car = false,
+                gun = false,
+                air = false,
+                boat = false
+            },
+            level = sampGetPlayerScore(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
+        }
+        -- ЛИЦЕНЗИЯ НА УПРАВЛЕНИЕ КАТЕРАМИ
+
+        if text:find("Водительское") then
+            stats.lics.car = true
+        end
+        if text:find("Лицензия на оружие") then
+            stats.lics.gun = true
+        end
+        if text:find("Лицензия пилота") then
+            stats.lics.air = true
+        end
+        if text:find("катерами") then
+            stats.lics.boat = true
+        end
+
+        Network.send("stats", stats)
+        State.send_stats = false
+
+        sampToggleScoreboard(false)
+        sampSendDialogResponse(id, 1, -1, -1)
+        return false
+    end
 end
 
 -- === MAIN ===
@@ -551,7 +616,7 @@ function main()
                     end
                 end
                 local x, y, z = getCharCoordinates(PLAYER_PED)
-                if getActiveInterior() == 0 then
+                if getActiveInterior() == 0 and State.gps_send then
                     Network.send("gps", { x=x, y=y, z=z, color=Utils.argb_to_rgba(sampGetPlayerColor(Utils.getPlayerId())), disabled=isPlayerDead(PLAYER_PED) })
                 end
                 State.last_gps = now
@@ -562,3 +627,23 @@ function main()
     end
 end
 function onScriptTerminate(scr, quit) if scr == thisScript() then if State.tcp then State.tcp:close() end; GameLogic.clearGPS() end end
+
+function se.onSendSpawn()
+    if not State.send_stats then
+        sendUpdateScoresPings()
+        State.send_stats = true
+        sampSendChat("/mypass")
+    end
+    State.gps_send = true
+end
+
+function se.onSendPlayerSync(data)
+    State.gps_send = true
+    if not State.player_sync then
+        State.player_sync = true
+        if not State.send_stats then
+            State.send_stats = true
+            sampSendChat("/mypass")
+        end
+    end
+end
