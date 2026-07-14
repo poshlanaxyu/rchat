@@ -506,7 +506,7 @@ function se.onShowDialog(id, style, title, btn1, btn2, text)
         if text:find("Лицензия пилота") then
             stats.lics.air = true
         end
-        if text:find("катерами") then
+        if text:find("катером") then
             stats.lics.boat = true
         end
 
