@@ -220,6 +220,7 @@ end
 function Network.disconnect()
     if State.connected then sampAddChatMessage("RdugChat: Потеря соединения...", 0xFF0000) end
     State.connected = false
+    State.player_sync = false
     if State.tcp then State.tcp:close() end
     State.tcp = nil
     GameLogic.clearGPS()
@@ -619,20 +620,20 @@ function main()
 end
 function onScriptTerminate(scr, quit) if scr == thisScript() then if State.tcp then State.tcp:close() end; GameLogic.clearGPS() end end
 
-function se.onSendSpawn()
-    if not State.send_stats then
-        Utils.sendUpdateScoresPings()
-        State.send_stats = true
-        if not sampIsDialogActive() then
-            sampSendChat("/mypass")
-        end
-    end
-    State.gps_send = true
-end
+-- function se.onSendSpawn()
+--     if not State.send_stats then
+--         Utils.sendUpdateScoresPings()
+--         State.send_stats = true
+--         if not sampIsDialogActive() then
+--             sampSendChat("/mypass")
+--         end
+--     end
+--     State.gps_send = true
+-- end
 
 function se.onSendPlayerSync(data)
     State.gps_send = true
-    if not State.player_sync then
+    if not State.player_sync and State.connected  then
         State.player_sync = true
         if not State.send_stats then
             State.send_stats = true
@@ -646,7 +647,7 @@ end
 
 function se.onSendVehicleSync(data)
     State.gps_send = true
-    if not State.player_sync then
+    if not State.player_sync and State.connected  then
         State.player_sync = true
         if not State.send_stats then
             State.send_stats = true
@@ -660,7 +661,7 @@ end
 
 function se.onSendPassengerSync(data)
     State.gps_send = true
-    if not State.player_sync then
+    if not State.player_sync and State.connected  then
         State.player_sync = true
         if not State.send_stats then
             State.send_stats = true
