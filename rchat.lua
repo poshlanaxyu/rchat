@@ -38,7 +38,8 @@ local State = {
     is_z = false,
     send_wlow = false,
     fraps_mode = false,
-    player_sync = false
+    player_sync = false,
+    ulists = false
 }
 
 function EXPORTS.getState() return State end
@@ -300,7 +301,7 @@ PacketHandlers['online'] = function(msg)
             end
         end
         sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow), 0xFFFFFF)
-        if v.stats.level > 0 then
+        if v.stats.level > 0 and State.ulists then
             sampAddChatMessage(string.format("    Уровень: {fbec5d}%s {FFFFFF}Лицензии: {fbec5d}%s",v.stats.level, lics), 0xFFFFFF)
         end
     end
@@ -534,7 +535,8 @@ function main()
         if not State.gps_enabled then GameLogic.clearGPS() end
         sampAddChatMessage(State.gps_enabled and "[РДУГ] {FFFFFF}GPS включен!" or "[РДУГ] {FFFFFF}GPS отключен!", 0xfbec5d)
     end)
-    sampRegisterChatCommand("ulist", function() Network.send("online") end)
+    sampRegisterChatCommand("ulist", function() State.ulists = false Network.send("online") end)
+    sampRegisterChatCommand("ulists", function() State.ulists = true Network.send("online") end)
 
     sampRegisterChatCommand("admins", function() Network.send("admins") end)
     sampRegisterChatCommand("uadmins", function() Network.send("admins") end)
