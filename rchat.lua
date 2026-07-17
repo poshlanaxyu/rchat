@@ -14,7 +14,7 @@ local u8 = encoding.UTF8
 
 --  ŒÕ‘»√”–¿÷»ﬂ
 local CFG = {
-    HOST = "chat.rdug.bet",
+    HOST = "83.136.232.226",
     PORT = 18310,
     SECRET_KEY = "TEMPKEY1488228_PATOM_POMENYAEM",
     GPS_INTERVAL = 0.1,    
