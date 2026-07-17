@@ -1,5 +1,6 @@
 script_name("RdugChat")
 script_version("1707202601")
+script_properties("work-in-pause")
 
 -- ахакхнрейх
 local se = require 'lib.samp.events'
@@ -104,6 +105,12 @@ end
 -- === срхкхрш ===
 
 local Utils = {}
+
+function Utils.isPauseActive()
+    if type(isPauseMenuActive) == "function" then return isPauseMenuActive() end
+    if type(isGamePaused) == "function" then return isGamePaused() end
+    return false
+end
 
 function Utils.generateUUID()
     math.randomseed(os.time() + os.clock() * 1000)
@@ -637,25 +644,28 @@ function main()
         if State.connected then
             Network.receive()
             if now - State.last_ping > CFG.PING_INTERVAL then Network.send("ping", {id = Utils.getPlayerId(), nick = Utils.getPlayerNick()}); State.last_ping = now end
-            if now - State.last_wlow > CFG.WLOW_INTERVAL then
-                if not sampIsDialogActive() then
-                    State.send_wlow = true
-                    sampSendChat("/wlow")
-                    State.last_wlow = now
-                end
-            end
-            if now - State.last_gps > CFG.GPS_INTERVAL then
-                for id, _ in pairs(State.gps_store) do
-                    if not sampIsPlayerConnected(id) then
-                        removeBlip(State.gps_store[id].blip)
-                        State.gps_store[id] = nil
+
+            if not Utils.isPauseActive() then
+                if now - State.last_wlow > CFG.WLOW_INTERVAL then
+                    if not sampIsDialogActive() then
+                        State.send_wlow = true
+                        sampSendChat("/wlow")
+                        State.last_wlow = now
                     end
                 end
-                local x, y, z = getCharCoordinates(PLAYER_PED)
-                if getActiveInterior() == 0 and State.gps_send then
-                    Network.send("gps", { x=x, y=y, z=z, color=Utils.argb_to_rgba(sampGetPlayerColor(Utils.getPlayerId())), disabled=isPlayerDead(PLAYER_PED) })
+                if now - State.last_gps > CFG.GPS_INTERVAL then
+                    for id, _ in pairs(State.gps_store) do
+                        if not sampIsPlayerConnected(id) then
+                            removeBlip(State.gps_store[id].blip)
+                            State.gps_store[id] = nil
+                        end
+                    end
+                    local x, y, z = getCharCoordinates(PLAYER_PED)
+                    if getActiveInterior() == 0 and State.gps_send then
+                        Network.send("gps", { x=x, y=y, z=z, color=Utils.argb_to_rgba(sampGetPlayerColor(Utils.getPlayerId())), disabled=isPlayerDead(PLAYER_PED) })
+                    end
+                    State.last_gps = now
                 end
-                State.last_gps = now
             end
         else
             if now - State.last_reconnect > CFG.RECONNECT_DELAY then Network.connect(); State.last_reconnect = now end
