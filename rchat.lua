@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("1307202602")
+script_version("1707202601")
 
 -- ¡»¡À»Œ“≈ »
 local se = require 'lib.samp.events'
@@ -20,13 +20,18 @@ local CFG = {
     PING_INTERVAL = 1.0,   
     RECONNECT_DELAY = 1.0,
     WLOW_INTERVAL = 10.0,
-    DEBUG = false
+    DEBUG = false,
+    RECEIVE_CHUNK = 4096,
+    RECEIVE_CHUNKS_PER_TICK = 32,
+    RECEIVE_PACKETS_PER_TICK = 64,
+    MAX_RX_BUFFER = 262144
 }
 
 -- —Œ—“ŒﬂÕ»≈
 local State = {
     tcp = nil,
     connected = false,
+    rx_buffer = "",
     last_ping = 0,
     last_gps = 0,
     last_wlow = 0,
@@ -189,6 +194,7 @@ end
 function Network.connect()
     if State.tcp then State.tcp:close() end
     State.connected = false
+    State.rx_buffer = ""
 
     local host, resolve_err = Network.resolveHost()
     if CFG.DEBUG and resolve_err then
@@ -221,6 +227,7 @@ end
 function Network.disconnect()
     if State.connected then sampAddChatMessage("RdugChat: œÓÚÂˇ ÒÓÂ‰ËÌÂÌËˇ...", 0xFF0000) end
     State.connected = false
+    State.rx_buffer = ""
     State.player_sync = false
     if State.tcp then State.tcp:close() end
     State.tcp = nil
@@ -244,20 +251,55 @@ function Network.send(type, data)
     end
 end
 
+function Network.processLine(line)
+    line = line:gsub("\r$", "")
+    if line == "" then return end
+
+    local encrypted = dec_base64(line)
+    local json_str = rc4(CFG.SECRET_KEY, encrypted)
+
+    local status, msg = pcall(cjson.decode, json_str)
+    if status and type(msg) == "table" then PacketHandlers.dispatch(msg) end
+end
+
 function Network.receive()
     if not State.connected or not State.tcp then return end
-    while true do
-        local line, err = State.tcp:receive('*l')
-        if not line then
-            if err == "closed" then Network.disconnect() end
+
+    local chunks_read = 0
+    local packets_processed = 0
+
+    while chunks_read < CFG.RECEIVE_CHUNKS_PER_TICK and packets_processed < CFG.RECEIVE_PACKETS_PER_TICK do
+        local chunk, err, partial = State.tcp:receive(CFG.RECEIVE_CHUNK)
+        local data = chunk or partial
+
+        if data and #data > 0 then
+            chunks_read = chunks_read + 1
+            State.rx_buffer = State.rx_buffer .. data
+
+            if #State.rx_buffer > CFG.MAX_RX_BUFFER then
+                Network.disconnect()
+                return
+            end
+
+            while packets_processed < CFG.RECEIVE_PACKETS_PER_TICK do
+                local newline_pos = State.rx_buffer:find("\n", 1, true)
+                if not newline_pos then break end
+
+                local line = State.rx_buffer:sub(1, newline_pos - 1)
+                State.rx_buffer = State.rx_buffer:sub(newline_pos + 1)
+                packets_processed = packets_processed + 1
+                Network.processLine(line)
+            end
+        end
+
+        if err == "closed" then
+            Network.disconnect()
             break
         end
-        
-        local encrypted = dec_base64(line)
-        local json_str = rc4(CFG.SECRET_KEY, encrypted)
-        
-        local status, msg = pcall(cjson.decode, json_str)
-        if status then PacketHandlers.dispatch(msg) end
+
+        if not chunk then
+            break
+        end
     end
 end
 
