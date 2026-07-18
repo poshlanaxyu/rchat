@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("1707202601")
+script_version("1807202603")
 script_properties("work-in-pause")
 
 -- БИБЛИОТЕКИ
@@ -25,7 +25,14 @@ local CFG = {
     RECEIVE_CHUNK = 4096,
     RECEIVE_CHUNKS_PER_TICK = 32,
     RECEIVE_PACKETS_PER_TICK = 64,
-    MAX_RX_BUFFER = 262144
+    MAX_RX_BUFFER = 262144,
+    MAP_PING_DEFAULT_DURATION = 30,
+    MAP_PING_MAX_DURATION = 300,
+    MAP_PING_BLINK_TIME = 6,
+    MAP_PING_BLINK_INTERVAL = 350,
+    MAP_PING_SPRITE = 53,
+    MAP_PING_SCALE = 3,
+    MAP_PING_COLOR = 0xFFDD00FF
 }
 
 -- СОСТОЯНИЕ
@@ -40,6 +47,7 @@ local State = {
     gps_enabled = true,
     gps_send = false,
     gps_store = {},    
+    map_pings = {},
     attackers = {},   
     is_z = false,
     send_wlow = false,
@@ -154,6 +162,16 @@ function Utils.getPlayerId() return select(2, sampGetPlayerIdByCharHandle(PLAYER
 function Utils.getPlayerNick() return sampGetPlayerNickname(Utils.getPlayerId()) end
 function Utils.argb_to_rgba(argb) return bit.bor(bit.lshift(bit.band(bit.rshift(argb, 16), 0xFF), 24), bit.lshift(bit.band(bit.rshift(argb, 8), 0xFF), 16), bit.lshift(bit.band(argb, 0xFF), 8), bit.band(bit.rshift(argb, 24), 0xFF)) end
 function Utils.hex_color(int_color) return string.format('%06X', bit.band(int_color, 0xFFFFFF)) end
+function Utils.getMapMarkerCoordinates()
+    if type(getTargetBlipCoordinates) ~= "function" then return false end
+
+    local found, x, y, z = getTargetBlipCoordinates()
+    if found == true and x and y then return true, x, y, z or 0 end
+    if type(found) == "number" and type(x) == "number" then return true, found, x, y or 0 end
+
+    return false
+end
+
 function Utils.getAllSampPlayers()
     players = {}
     for i = 0, sampGetMaxPlayerId() do
@@ -239,6 +257,7 @@ function Network.disconnect()
     if State.tcp then State.tcp:close() end
     State.tcp = nil
     GameLogic.clearGPS()
+    GameLogic.clearMapPings()
 end
 
 function Network.send(type, data)
@@ -332,6 +351,7 @@ PacketHandlers['online'] = function(msg)
         local afk = ""
         local wlow = ""
         local lics = ""
+        local room_info = ""
         if sampIsPlayerPaused(v.id) then afk = " {34C924}< AFK >" end
         if v.wlow.us > 0 or v.wlow.af > 0 or v.wlow.rc > 0 or v.wlow.int > 0 then wlow = string.format(" {FF2222}В РОЗЫСКЕ:", v.wlow.us) end
         for st, wlow_num in pairs(v.wlow) do
@@ -349,7 +369,10 @@ PacketHandlers['online'] = function(msg)
                 end
             end
         end
-        sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow), 0xFFFFFF)
+        if State.ulists and (msg.access_level or 1) > 1 then
+            room_info = string.format(" {AAAAAA}ROOM:%s LVL:%s", v.room or 1, v.access_level or 1)
+        end
+        sampAddChatMessage(string.format("Ник: {abcdef}%s - %s {ffffff}Ранг:{fbec5d} %s%s%s%s", v.nick, v.id, u8:decode(v.rank), afk, wlow, room_info), 0xFFFFFF)
         if v.stats.level > 0 and State.ulists then
             sampAddChatMessage(string.format("    Уровень: {fbec5d}%s {FFFFFF}Лицензии: {fbec5d}%s",v.stats.level, lics), 0xFFFFFF)
         end
@@ -359,13 +382,22 @@ end
 PacketHandlers['admins'] = function(msg)
     sampAddChatMessage("Админы онлайн, всего {D8A903}" .. #msg.admins .. "{FFFFFF} пидорасов:", 0xFFFFFF)
     for _, v in ipairs(msg.admins) do
-        sampAddChatMessage(string.format("{fbec5d}[%s] {FFFFFF}%s", v.id, v.nick), 0xfbec5d)
+        sampAddChatMessage(string.format("[%s] {FFFFFF}%s", v.id, v.nick), 0xfbec5d)
     end
 end
 
 PacketHandlers['gps'] = function(msg)
     if not State.gps_enabled then return end
     for _, data in ipairs(msg.data) do GameLogic.updateBlip(data) end
+end
+
+PacketHandlers['map_ping_clear'] = function(msg)
+    GameLogic.clearMapPings()
+end
+
+PacketHandlers['map_ping'] = function(msg)
+    if not State.fraps_mode and msg.text then sampAddChatMessage(u8:decode(msg.text), 0xfbec5d) end
+    GameLogic.addMapPing(msg)
 end
 
 PacketHandlers['attacker'] = function(msg)
@@ -410,6 +442,75 @@ function GameLogic.clearGPS()
     for id, entry in pairs(State.gps_store) do removeBlip(entry.blip) end
     State.gps_store = {}
 end
+
+function GameLogic.createMapPingBlip(entry)
+    local blip = addSpriteBlipForCoord(entry.x, entry.y, entry.z, CFG.MAP_PING_SPRITE)
+    changeBlipScale(blip, CFG.MAP_PING_SCALE)
+    changeBlipColour(blip, CFG.MAP_PING_COLOR)
+    return blip
+end
+
+function GameLogic.removeMapPing(id)
+    local entry = State.map_pings[id]
+    if not entry then return end
+    if entry.blip then removeBlip(entry.blip) end
+    State.map_pings[id] = nil
+end
+
+function GameLogic.clearMapPings()
+    local ids = {}
+    for id, _ in pairs(State.map_pings) do table.insert(ids, id) end
+    for _, id in ipairs(ids) do GameLogic.removeMapPing(id) end
+end
+
+function GameLogic.flashMapPing(id)
+    while State.map_pings[id] do
+        local entry = State.map_pings[id]
+        local now = os.clock()
+        if now >= entry.expires_at then break end
+
+        if now < entry.blink_until then
+            if entry.blip then
+                removeBlip(entry.blip)
+                entry.blip = nil
+            else
+                entry.blip = GameLogic.createMapPingBlip(entry)
+            end
+            wait(CFG.MAP_PING_BLINK_INTERVAL)
+        else
+            if not entry.blip then entry.blip = GameLogic.createMapPingBlip(entry) end
+            wait(250)
+        end
+    end
+
+    GameLogic.removeMapPing(id)
+end
+
+function GameLogic.addMapPing(msg)
+    local x = tonumber(msg.x)
+    local y = tonumber(msg.y)
+    local z = tonumber(msg.z) or 0
+    if not x or not y then return end
+
+    local duration = tonumber(msg.duration) or CFG.MAP_PING_DEFAULT_DURATION
+    duration = math.max(1, math.min(math.floor(duration), CFG.MAP_PING_MAX_DURATION))
+
+    local id = tostring(msg.ping_id or ((msg.nick or "ping") .. ":" .. tostring(os.clock())))
+    GameLogic.clearMapPings()
+
+    local now = os.clock()
+    State.map_pings[id] = {
+        x = x,
+        y = y,
+        z = z,
+        expires_at = now + duration,
+        blink_until = now + math.min(CFG.MAP_PING_BLINK_TIME, duration),
+        blip = nil
+    }
+    State.map_pings[id].blip = GameLogic.createMapPingBlip(State.map_pings[id])
+    lua_thread.create(GameLogic.flashMapPing, id)
+end
+
 function GameLogic.flashPlayer(id)
     local start = os.clock()
     local orig_color = Utils.argb_to_rgba(sampGetPlayerColor(id))
@@ -584,8 +685,40 @@ function main()
         if not State.gps_enabled then GameLogic.clearGPS() end
         sampAddChatMessage(State.gps_enabled and "[РДУГ] {FFFFFF}GPS включен!" or "[РДУГ] {FFFFFF}GPS отключен!", 0xfbec5d)
     end)
-    sampRegisterChatCommand("ulist", function() State.ulists = false Network.send("online") end)
-    sampRegisterChatCommand("ulists", function() State.ulists = true Network.send("online") end)
+    sampRegisterChatCommand("ulist", function() State.ulists = false Network.send("online", { all = false }) end)
+    sampRegisterChatCommand("ulists", function() State.ulists = true Network.send("online", { all = true }) end)
+    sampRegisterChatCommand("uroom", function(arg)
+        local room = arg:match("^(%d+)$")
+        if room then
+            Network.send("room", { room = tonumber(room) })
+        end
+    end)
+    sampRegisterChatCommand("uping", function(arg)
+        local clean_arg = tostring(arg or ""):match("^%s*(.-)%s*$")
+        local duration = CFG.MAP_PING_DEFAULT_DURATION
+
+        if clean_arg ~= "" then
+            duration = tonumber(clean_arg)
+            if not duration then
+                sampAddChatMessage("Используйте: /uping [секунды]", -1)
+                return
+            end
+            duration = math.floor(duration)
+        end
+
+        if duration < 1 or duration > CFG.MAP_PING_MAX_DURATION then
+            sampAddChatMessage("Время метки: 1-" .. CFG.MAP_PING_MAX_DURATION .. " секунд.", -1)
+            return
+        end
+
+        local ok, x, y, z = Utils.getMapMarkerCoordinates()
+        if not ok then
+            sampAddChatMessage("Поставьте метку на карте ПКМ и используйте /uping [секунды]", -1)
+            return
+        end
+
+        Network.send("map_ping", { x = x, y = y, z = z or 0, duration = duration })
+    end)
 
     sampRegisterChatCommand("admins", function() Network.send("admins") end)
     sampRegisterChatCommand("uadmins", function() Network.send("admins") end)
@@ -596,6 +729,15 @@ function main()
             Network.send("admin_cmd", { cmd = "urank", target = id, value = u8(rank) })
         else
             sampAddChatMessage("Используйте: /urank [id] [rank]", -1)
+        end
+    end)
+
+    sampRegisterChatCommand("ulevel", function(arg)
+        local id, level = arg:match("(%S+)%s+(%d+)")
+        if id and level then
+            Network.send("admin_cmd", { cmd = "ulevel", target = id, value = tonumber(level) })
+        else
+            sampAddChatMessage("Используйте: /ulevel [id/full_name/uuid] [level]", -1)
         end
     end)
 
@@ -672,7 +814,7 @@ function main()
         end
     end
 end
-function onScriptTerminate(scr, quit) if scr == thisScript() then if State.tcp then State.tcp:close() end; GameLogic.clearGPS() end end
+function onScriptTerminate(scr, quit) if scr == thisScript() then if State.tcp then State.tcp:close() end; GameLogic.clearGPS(); GameLogic.clearMapPings() end end
 
 -- function se.onSendSpawn()
 --     if not State.send_stats then
