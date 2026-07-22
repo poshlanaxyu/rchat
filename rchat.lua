@@ -1,5 +1,5 @@
 script_name("RdugChat")
-script_version("1807202603")
+script_version("2207202601")
 script_properties("work-in-pause")
 
 -- ÁÈÁËÈÎÒÅÊÈ
@@ -14,7 +14,7 @@ local u8 = encoding.UTF8
 
 -- ÊÎÍÔÈÃÓĞÀÖÈß
 local CFG = {
-    HOST = "chat.rdug.bet",
+    HOST = "127.0.0.1",
     PORT = 18310,
     SECRET_KEY = "TEMPKEY1488228_PATOM_POMENYAEM",
     GPS_INTERVAL = 0.1,    
@@ -746,6 +746,15 @@ function main()
             Network.send("admin_cmd", { cmd = "uban", target = arg })
         else
             sampAddChatMessage("Èñïîëüçóéòå: /uban [id/full_name/uuid]", -1)
+        end
+    end)
+
+    sampRegisterChatCommand("ufind", function(arg)
+        local id = tonumber(arg)
+        if id then
+            Network.send("find", { id = id })
+        else
+            sampAddChatMessage("Èñïîëüçóéòå: /ufind [id]", -1)
         end
     end)
 
